@@ -36,6 +36,9 @@ void SPI_Init(){
 void main(){
 	FsysSelect(FSYS_HIRC); // Select HIRC (High Internal RC Oscillator)
     MODIFY_HIRC(HIRC_24);  // Set HIRC to 24 MHz
+    
+    P11_QUASI_MODE;
+	P12_QUASI_MODE;
 
 	SPI_Init();
 	ILI9341_Init();
