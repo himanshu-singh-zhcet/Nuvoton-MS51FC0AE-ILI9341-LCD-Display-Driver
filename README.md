@@ -15,7 +15,7 @@ This repository contains code to interface the ILI9341 SPI-based 2.4" TFT LCD di
 
 - **Microcontroller**: Nuvoton MS51FC0AE
 - **Display**: ILI9341 TFT LCD (SPI interface)
-- **Crystal Frequency**: 24 MHz (external)
+- **Crystal Frequency**: 24 MHz 
 - **Power Supply**: 3.3V
 
 ## 🧰 Pin Configuration
@@ -24,11 +24,12 @@ This repository contains code to interface the ILI9341 SPI-based 2.4" TFT LCD di
 |-------------|-------------------|----------------|
 | VCC         | 3.3V Power        | 3.3V           |
 | GND         | Ground            | GND            |
-| CS          | Chip Select       | P1.0           |
-| RESET       | Reset             | P1.1           |
-| DC/RS       | Data/Command      | P1.2           |
-| SDI/MOSI    | SPI MOSI          | P1.5           |
-| SCK         | SPI Clock         | P1.7           |
+| CS          | Chip Select       | P1.5           |
+| RESET       | Reset             | P1.2           |
+| D/C         | Data/Command      | P1.1           |
+| SPI/MOS1    | SPI/MOSI          | P0.0           |
+| SPI/MISO    | SPI/MISO          | P0.1           |
+| SCK         | SPI Clock         | P1.0           |
 | LED         | Backlight Power   | 3.3V (or GPIO) |
 
 > **Note**: Adjust pins in the code as per your connection.
