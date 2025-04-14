@@ -1,0 +1,544 @@
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE INTERRUPT
+OBJECT MODULE PLACED IN .\Objects\interrupt.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\interrupt.c LARGE OPTIMIZE(8,SPEED) BROWSE
+                    - INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\interrupt.lst) TABS(2) OBJECT(.\Objects
+                    -\interrupt.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "uart.h"
+   4          #include "device.h"
+   5          #include "buzzer.h"
+   6          #include "function.h"
+   7          #include "wdtConfig.h"
+   8          #include "uartSerial.h"
+   9          #include "iotfyiot.h"
+  10          
+  11          /********* For Motor control **********/
+  12          #include "fanMasterControl.h"
+  13          /**************************************/
+  14          #if (ENABLE_RF == 1)
+                #include "rfReceiver.h"
+              #endif
+  17          
+  18          #if (ENABLE_LED == 1)
+  19            #include "led_indication.h"
+  20          #endif
+  21          
+  22          extern volatile fanConfig currentConfig, previousConfig;
+  23          
+  24          /*************Variables*****************/
+  25          #if (ENABLE_TSOP == 1)
+  26            extern volatile uint32_t bitPattern;        
+  27            extern volatile uint8_t  irPulseTime;       
+  28            extern volatile uint8_t  msCount;
+  29            extern volatile int    pulseCount;
+  30            extern volatile uint32_t IRkey;
+  31          #endif
+  32          
+  33          /******************HARDWARE RELATED************************/
+  34          
+  35          extern volatile uint8_t  configChanged;
+  36          extern volatile uint16_t oneSecCount;
+  37          extern volatile uint8_t  oneSecFlag;
+  38          extern volatile uint16_t halfSecondFlag;
+  39          
+  40          /****************************Save Flag ***************************************/
+  41          extern uint16_t mbiRegister;
+  42          extern uint8_t  wifiLEDBlink;
+  43          extern uint8_t  iotfyNetwork;
+  44          extern uint8_t  iotfyNetworkUpdateFlag;
+  45          extern uint8_t  turboIndication;
+  46          
+  47          /***************** for Motor control ******************************/
+  48          void INT0_ISR(void) interrupt 0 {        // Vector @  0x03
+  49   1          _push_(SFRS); 
+  50   1          clr_TCON_IE0;
+  51   1          FG_EXTI_InterruptHandler();
+  52   1          _pop_(SFRS);
+  53   1      }
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 2   
+
+  54          /******************************************************************/
+  55          
+  56          /******************* TSOP Interrupt ******************************/
+  57          #if (ENABLE_TSOP == 1)
+  58            void INT1_ISR(void) interrupt 2  {      // Vector @  0x13 
+  59   1          _push_(SFRS);
+  60   1          irPulseTime = msCount; 
+  61   1          msCount = 0;
+  62   1          TR0 = 0;
+  63   1          TH0 = TH0_INIT;   // Reload the timer value for 1ms Delay
+  64   1          TL0 = TL0_INIT;
+  65   1          TR0 = 1;
+  66   1          pulseCount++;
+  67   1          
+  68   1          if((pulseCount>=1) && (pulseCount<=(RM_DATA_SIZE-1))) {
+  69   2            if(irPulseTime>=2) {
+  70   3              bitPattern |=(uint32_t)1<<((RM_DATA_SIZE-1)-pulseCount);        //pulse width greater than 2ms is consider
+             -ed as logic1
+  71   3            } else {
+  72   3              bitPattern |=(uint32_t)0<<((RM_DATA_SIZE-1)-pulseCount);
+  73   3            }
+  74   2          }
+  75   1      
+  76   1          if(pulseCount == (RM_DATA_SIZE - 1)) {
+  77   2            IRkey = bitPattern;
+  78   2            pulseCount = -1;
+  79   2            bitPattern = 0;
+  80   2          }
+  81   1          IE1 = 0;            //clr int flag wait next falling edge
+  82   1          _pop_(SFRS);
+  83   1        }
+  84          #endif
+  85          /*****************************************************************/
+  86          
+  87          void SerialPort0_ISR(void) interrupt 4 {   // Vector @  0x23  
+  88   1        _push_(SFRS);
+  89   1      
+  90   1          if(RI) {
+  91   2            #if (ENABLE_IOT == 1)
+  92   2            serialReceiveHandler(SBUF);
+  93   2          #endif
+  94   2            clr_SCON_RI;
+  95   2          }
+  96   1        
+  97   1          if(TI == 1) {
+  98   2          clr_SCON_TI;
+  99   2          }
+ 100   1        _pop_(SFRS);
+ 101   1      }
+ 102          
+ 103          void Timer0_ISR (void) interrupt 1 {   // Vector @  0x0B
+ 104   1        _push_(SFRS);
+ 105   1        #if (ENABLE_TSOP == 1)
+ 106   1          if(msCount<50) {
+ 107   2            msCount++;
+ 108   2            } else if(msCount == 50) {
+ 109   2            pulseCount = -1;
+ 110   2            bitPattern = 0;
+ 111   2          }
+ 112   1        #endif
+ 113   1        
+ 114   1        buzzerHandler();
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 3   
+
+ 115   1      
+ 116   1        #if (ENABLE_LED == 1)
+ 117   1          ledHandler();
+ 118   1        #endif
+ 119   1        
+ 120   1        #if (ENABLE_RF == 1)
+                  rfAddressCounterSaveCheck();
+                  rfTimeoutCheckHandler();
+                #endif
+ 124   1      
+ 125   1        #if (ENABLE_IOT == 1)
+ 126   1          serialTimeHandler();
+ 127   1        #endif
+ 128   1      
+ 129   1        onboardingTimer();
+ 130   1      
+ 131   1        /******************* Motor Driver Control *************/
+ 132   1        motorControlHandlersInTimers();
+ 133   1        /*****************************************************/
+ 134   1      
+ 135   1        oneSecCount++;
+ 136   1        if(oneSecCount == 1000) {
+ 137   2          oneSecFlag = 1;
+ 138   2          oneSecCount = 0;        
+ 139   2        }
+ 140   1      
+ 141   1        TH0 = TH0_INIT;
+ 142   1          TL0 = TL0_INIT;
+ 143   1          TF0 = 0 ;
+ 144   1        _pop_(SFRS);
+ 145   1      }
+ 146          
+ 147          void WDT_ISR (void)   interrupt 10
+ 148          {
+ 149   1          _push_(SFRS);
+ 150   1          clr_WDCON_WDTF;
+ 151   1          set_WDCON_WDCLR;
+ 152   1          
+ 153   1          while((WDCON|~SET_BIT6) == 0xFF);   
+ 154   1        Enable_WDT_Reset_Config();
+ 155   1          _pop_(SFRS);
+ 156   1      }
+ 157          
+ 158          void Set_Interrupt_Priority_Level( unsigned char intSource, unsigned char intPriority) {
+ 159   1        switch (intSource) {
+ 160   2          case INT_INT0: {
+ 161   3            switch (intPriority) {
+ 162   4              case 0:  
+ 163   4                clr_IP_PX0; 
+ 164   4                clr_IPH_PX0H; 
+ 165   4              break;
+ 166   4              
+ 167   4              case 1:  
+ 168   4                clr_IP_PX0; 
+ 169   4                set_IPH_PX0H;
+ 170   4              break;
+ 171   4              
+ 172   4              case 2:  
+ 173   4                set_IP_PX0; 
+ 174   4                clr_IPH_PX0H; 
+ 175   4              break;
+ 176   4              
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 4   
+
+ 177   4              case 3:  
+ 178   4                clr_IP_PX0; 
+ 179   4                set_IPH_PX0H; 
+ 180   4              break;
+ 181   4            }
+ 182   3          }
+ 183   2      
+ 184   2          case INT_BOD: {
+ 185   3            switch (intPriority) {
+ 186   4              case 0:  
+ 187   4                clr_IP_PBOD; 
+ 188   4                clr_IPH_PBODH; 
+ 189   4              break;
+ 190   4              
+ 191   4              case 1:  
+ 192   4                clr_IP_PBOD; 
+ 193   4                set_IPH_PBODH; 
+ 194   4              break;
+ 195   4              
+ 196   4              case 2:  
+ 197   4                set_IP_PBOD; 
+ 198   4                clr_IPH_PBODH; 
+ 199   4              break;
+ 200   4              
+ 201   4              case 3:  
+ 202   4                set_IP_PBOD; 
+ 203   4                set_IPH_PBODH; 
+ 204   4              break;
+ 205   4            }
+ 206   3          }
+ 207   2      
+ 208   2          case INT_WDT : {
+ 209   3            switch (intPriority) {
+ 210   4            case 0:  
+ 211   4              clr_EIP_PWDT; 
+ 212   4              clr_EIPH_PWDTH; 
+ 213   4            break;
+ 214   4            
+ 215   4            case 1:  
+ 216   4              clr_EIP_PWDT; 
+ 217   4              set_EIPH_PWDTH;
+ 218   4            break;
+ 219   4            
+ 220   4            case 2:  
+ 221   4              set_EIP_PWDT; 
+ 222   4              clr_EIPH_PWDTH; 
+ 223   4            break;
+ 224   4            
+ 225   4            case 3:  
+ 226   4              set_EIP_PWDT; 
+ 227   4              set_EIPH_PWDTH; 
+ 228   4            break;
+ 229   4            }
+ 230   3          }
+ 231   2                
+ 232   2          case INT_Timer0: {
+ 233   3            switch (intPriority) {
+ 234   4            case 0:  
+ 235   4              clr_IP_PT0; 
+ 236   4              clr_IPH_PT0H; 
+ 237   4            break;
+ 238   4            
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 5   
+
+ 239   4            case 1:  
+ 240   4              clr_IP_PT0; 
+ 241   4              set_IPH_PT0H; 
+ 242   4            break;
+ 243   4            
+ 244   4            case 2:  
+ 245   4              set_IP_PT0; 
+ 246   4              clr_IPH_PT0H; 
+ 247   4            break;
+ 248   4            
+ 249   4            case 3:  
+ 250   4              set_IP_PT0; 
+ 251   4              set_IPH_PT0H; 
+ 252   4            break;
+ 253   4            }
+ 254   3          }
+ 255   2          
+ 256   2          case INT_I2C0: {
+ 257   3          switch (intPriority) {
+ 258   4          case 0:  
+ 259   4            clr_EIP_PI2C;
+ 260   4            clr_EIPH_PI2CH; 
+ 261   4          break;
+ 262   4      
+ 263   4          case 1:  
+ 264   4            clr_EIP_PI2C; 
+ 265   4            set_EIPH_PI2CH; 
+ 266   4          break;
+ 267   4          
+ 268   4          case 2:  
+ 269   4            set_EIP_PI2C; 
+ 270   4            clr_EIPH_PI2CH; 
+ 271   4          break;
+ 272   4          
+ 273   4          case 3:  
+ 274   4            set_EIP_PI2C; 
+ 275   4            set_EIPH_PI2CH; 
+ 276   4          break;
+ 277   4          
+ 278   4          }
+ 279   3        }
+ 280   2        
+ 281   2        case INT_ADC : {
+ 282   3          switch (intPriority) {
+ 283   4          case 0:  
+ 284   4            clr_IP_PADC; 
+ 285   4            clr_IPH_PADCH;
+ 286   4          break;
+ 287   4      
+ 288   4          case 1:  
+ 289   4            clr_IP_PADC; 
+ 290   4            set_IPH_PADCH; 
+ 291   4          break;
+ 292   4          
+ 293   4          case 2:  
+ 294   4            set_IP_PADC; 
+ 295   4            clr_IPH_PADCH; 
+ 296   4          break;
+ 297   4          
+ 298   4          case 3:  
+ 299   4            set_IP_PADC; 
+ 300   4            set_IPH_PADCH; 
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 6   
+
+ 301   4          break;
+ 302   4          }
+ 303   3        }
+ 304   2               
+ 305   2        case INT_INT1: {
+ 306   3          switch (intPriority) {
+ 307   4          case 0:  
+ 308   4            clr_IP_PX1; 
+ 309   4            clr_IPH_PX1H; 
+ 310   4          break;
+ 311   4      
+ 312   4          case 1:  clr_IP_PX1; set_IPH_PX1H; break;
+ 313   4          case 2:  set_IP_PX1; clr_IPH_PX1H; break;
+ 314   4          case 3:  set_IP_PX1; set_IPH_PX1H; break;
+ 315   4          }
+ 316   3        }
+ 317   2        
+ 318   2        case INT_PIT: {
+ 319   3          switch (intPriority) {
+ 320   4          case 0:  
+ 321   4            clr_EIP_PPI;
+ 322   4            clr_EIPH_PPIH; 
+ 323   4          break;
+ 324   4          
+ 325   4          case 1:  
+ 326   4            clr_EIP_PPI; 
+ 327   4            set_EIPH_PPIH; 
+ 328   4          break;
+ 329   4          
+ 330   4          case 2:  
+ 331   4            set_EIP_PPI; 
+ 332   4            clr_EIPH_PPIH; 
+ 333   4          break;
+ 334   4          
+ 335   4          case 3:  
+ 336   4            set_EIP_PPI; 
+ 337   4            set_EIPH_PPIH; 
+ 338   4          break;
+ 339   4          } 
+ 340   3        }
+ 341   2               
+ 342   2        case INT_Timer1: {
+ 343   3          switch (intPriority) {
+ 344   4          case 0:  
+ 345   4            clr_IP_PT1; 
+ 346   4            clr_IPH_PT1H; 
+ 347   4          break;
+ 348   4          case 1:  
+ 349   4            clr_IP_PT1; 
+ 350   4            set_IPH_PT1H; 
+ 351   4          break;
+ 352   4          case 2:  
+ 353   4            set_IP_PT1; 
+ 354   4            clr_IPH_PT1H; 
+ 355   4          break;
+ 356   4          case 3:  
+ 357   4            set_IP_PT1; 
+ 358   4            set_IPH_PT1H; 
+ 359   4          break;
+ 360   4          } 
+ 361   3        }
+ 362   2        
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 7   
+
+ 363   2        case INT_UART0 : {
+ 364   3          switch (intPriority) {          
+ 365   4          case 0:  
+ 366   4            clr_IP_PS; 
+ 367   4            clr_IPH_PSH; 
+ 368   4          break;
+ 369   4          case 1:  
+ 370   4            clr_IP_PS; 
+ 371   4            set_IPH_PSH; 
+ 372   4          break;
+ 373   4          case 2:  
+ 374   4            set_IP_PS; 
+ 375   4            clr_IPH_PSH; 
+ 376   4          break;
+ 377   4          case 3:  
+ 378   4            set_IP_PS; 
+ 379   4            set_IPH_PSH; 
+ 380   4          break;
+ 381   4          } 
+ 382   3        }
+ 383   2               
+ 384   2        case INT_PWM0_Brake : {
+ 385   3          switch (intPriority)
+ 386   3          {          
+ 387   4          case 0:  clr_EIP_PFB; clr_EIPH_PFBH; break;
+ 388   4          case 1:  clr_EIP_PFB; set_EIPH_PFBH; break;
+ 389   4          case 2:  set_EIP_PFB; clr_EIPH_PFBH; break;
+ 390   4          case 3:  set_EIP_PFB; set_EIPH_PFBH; break;
+ 391   4          }
+ 392   3        }
+ 393   2        
+ 394   2        case INT_SPI0 : {
+ 395   3          switch (intPriority)
+ 396   3          {          
+ 397   4          case 0:  clr_EIP_PSPI; clr_EIPH_PSPIH; break;
+ 398   4          case 1:  clr_EIP_PSPI; set_EIPH_PSPIH; break;
+ 399   4          case 2:  set_EIP_PSPI; clr_EIPH_PSPIH; break;
+ 400   4          case 3:  set_EIP_PSPI; set_EIPH_PSPIH; break;
+ 401   4          }  
+ 402   3        }
+ 403   2              
+ 404   2        case INT_Timer2 :
+ 405   2        switch (intPriority)
+ 406   2        {          
+ 407   3        case 0:  clr_EIP_PT2; clr_EIPH_PT2H; break;
+ 408   3        case 1:  clr_EIP_PT2; set_EIPH_PT2H; break;
+ 409   3        case 2:  set_EIP_PT2; clr_EIPH_PT2H; break;
+ 410   3        case 3:  set_EIP_PT2; set_EIPH_PT2H; break;
+ 411   3        }         
+ 412   2        case INT_Capture       :
+ 413   2        switch (intPriority)
+ 414   2        {          
+ 415   3        case 0:  clr_EIP_PCAP; clr_EIPH_PCAPH; break;
+ 416   3        case 1:  clr_EIP_PCAP; set_EIPH_PCAPH; break;
+ 417   3        case 2:  set_EIP_PCAP; clr_EIPH_PCAPH; break;
+ 418   3        case 3:  set_EIP_PCAP; set_EIPH_PCAPH; break;
+ 419   3        }
+ 420   2        case INT_PWM0          :                          
+ 421   2        switch (intPriority)
+ 422   2        {          
+ 423   3        case 0:  clr_EIP_PPWM; clr_EIPH_PPWMH; break;
+ 424   3        case 1:  clr_EIP_PPWM; set_EIPH_PPWMH; break;
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 8   
+
+ 425   3        case 2:  set_EIP_PPWM; clr_EIPH_PPWMH; break;
+ 426   3        case 3:  set_EIP_PPWM; set_EIPH_PPWMH; break;
+ 427   3        }
+ 428   2        case INT_UART1         :
+ 429   2        switch (intPriority)
+ 430   2        {          
+ 431   3        case 0:  clr_EIP1_PS_1; clr_EIPH1_PSH_1; break;
+ 432   3        case 1:  clr_EIP1_PS_1; set_EIPH1_PSH_1; break;
+ 433   3        case 2:  set_EIP1_PS_1; clr_EIPH1_PSH_1; break;
+ 434   3        case 3:  set_EIP1_PS_1; set_EIPH1_PSH_1; break;
+ 435   3        }        
+ 436   2        case INT_Timer3        :
+ 437   2        switch (intPriority)
+ 438   2        {          
+ 439   3        case 0:  clr_EIP1_PT3; clr_EIPH1_PT3H; break;
+ 440   3        case 1:  clr_EIP1_PT3; set_EIPH1_PT3H; break;
+ 441   3        case 2:  set_EIP1_PT3; clr_EIPH1_PT3H; break;
+ 442   3        case 3:  set_EIP1_PT3; set_EIPH1_PT3H; break;
+ 443   3        } 
+ 444   2        case INT_WKT           :
+ 445   2        switch (intPriority)
+ 446   2        {          
+ 447   3        case 0:  clr_EIP1_PWKT; clr_EIPH1_PWKTH; break;
+ 448   3        case 1:  clr_EIP1_PWKT; set_EIPH1_PWKTH; break;
+ 449   3        case 2:  set_EIP1_PWKT; clr_EIPH1_PWKTH; break;
+ 450   3        case 3:  set_EIP1_PWKT; set_EIPH1_PWKTH; break;
+ 451   3        }
+ 452   2        case INT_PWM1           :
+ 453   2        switch (intPriority)
+ 454   2        {          
+ 455   3        case 0:  clr_EIP1_PPWM1; clr_EIPH1_PPWM1H; break;
+ 456   3        case 1:  clr_EIP1_PPWM1; set_EIPH1_PPWM1H; break;
+ 457   3        case 2:  set_EIP1_PPWM1; clr_EIPH1_PPWM1H; break;
+ 458   3        case 3:  set_EIP1_PPWM1; set_EIPH1_PPWM1H; break;
+ 459   3        }
+ 460   2        case INT_PWM2           :
+ 461   2        switch (intPriority)
+ 462   2        {          
+ 463   3        case 0:  clr_EIP1_PPWM2; clr_EIPH1_PPWM2H; break;
+ 464   3        case 1:  clr_EIP1_PPWM2; set_EIPH1_PPWM2H; break;
+ 465   3        case 2:  set_EIP1_PPWM2; clr_EIPH1_PPWM2H; break;
+ 466   3        case 3:  set_EIP1_PPWM2; set_EIPH1_PPWM2H; break;
+ 467   3        }
+ 468   2        case INT_PWM3           :
+ 469   2        switch (intPriority)
+ 470   2        {          
+ 471   3        case 0:  clr_EIP1_PPWM3; clr_EIPH1_PPWM3H; break;
+ 472   3        case 1:  clr_EIP1_PPWM3; set_EIPH1_PPWM3H; break;
+ 473   3        case 2:  set_EIP1_PPWM3; clr_EIPH1_PPWM3H; break;
+ 474   3        case 3:  set_EIP1_PPWM3; set_EIPH1_PPWM3H; break;
+ 475   3        }
+ 476   2        case INT_SMC0           :
+ 477   2        switch (intPriority)
+ 478   2        {          
+ 479   3        case 0:  clr_EIP2_PSC0; clr_EIPH2_PSC0H; break;
+ 480   3        case 1:  clr_EIP2_PSC0; set_EIPH2_PSC0H; break;
+ 481   3        case 2:  set_EIP2_PSC0; clr_EIPH2_PSC0H; break;
+ 482   3        case 3:  set_EIP2_PSC0; set_EIPH2_PSC0H; break;
+ 483   3        }
+ 484   2        case INT_SMC1           :
+ 485   2        switch (intPriority)
+ 486   2        {          
+C51 COMPILER V9.60.7.0   INTERRUPT                                                         09/12/2024 17:56:53 PAGE 9   
+
+ 487   3        case 0:  clr_EIP2_PSC1; clr_EIPH2_PSC1H; break;
+ 488   3        case 1:  clr_EIP2_PSC1; set_EIPH2_PSC1H; break;
+ 489   3        case 2:  set_EIP2_PSC1; clr_EIPH2_PSC1H; break;
+ 490   3        case 3:  set_EIP2_PSC1; set_EIPH2_PSC1H; break;
+ 491   3        }
+ 492   2        case INT_SMC2           :
+ 493   2        switch (intPriority)
+ 494   2        {          
+ 495   3        case 0:  clr_EIP2_PSC2; clr_EIPH2_PSC2H; break;
+ 496   3        case 1:  clr_EIP2_PSC2; set_EIPH2_PSC2H; break;
+ 497   3        case 2:  set_EIP2_PSC2; clr_EIPH2_PSC2H; break;
+ 498   3        case 3:  set_EIP2_PSC2; set_EIPH2_PSC2H; break;
+ 499   3        }
+ 500   2        break;
+ 501   2        }
+ 502   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2032    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

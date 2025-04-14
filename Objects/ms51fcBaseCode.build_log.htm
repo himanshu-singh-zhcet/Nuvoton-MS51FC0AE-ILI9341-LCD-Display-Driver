@@ -1,0 +1,61 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: µVision V5.38.0.0
+Copyright (C) 2022 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: Himanshu Singh, IOTfy, LIC=----
+ 
+Tool Versions:
+Toolchain:       PK51 Prof. Develpers Kit  Version: 9.60.7.0
+Toolchain Path:  C:\Keil_v5\C51\BIN
+C Compiler:      C51.exe V9.60.7.0
+Assembler:       A51.exe V8.2.7.0
+Linker/Locator:  BL51.exe V6.22.4.0
+Library Manager: LIB51.exe V4.30.1.0
+Hex Converter:   OH51.exe V2.7.0.0
+CPU DLL:         S8051.DLL V3.125.1.0
+Dialog DLL:      DP51.DLL V2.69.0.0
+Target DLL:      Nuvoton_8051_Keil_uVision_Driver.dll V3.08
+Dialog DLL:      TP51.DLL V2.60.1.0
+ 
+<h2>Project:</h2>
+D:\Iotfy Dev\iotfy-graphic-lcd-nuvoton\iotfy-graphic-lcd-nuvoton\display.uvproj
+Project File Date:  04/14/2025
+
+<h2>Output:</h2>
+Rebuild target 'Target 1'
+compiling main.c...
+compiling ILI9341.c...
+compiling spi.c...
+compiling common.c...
+compiling watchdog.c...
+compiling sys.c...
+assembling STARTUP.A51...
+linking...
+BL51 BANKED LINKER/LOCATER V6.22.4.0 - SN: Eval Version
+COPYRIGHT (C) 1987-2021, Arm Limited or its Affiliates. All rights reserved.
+".\Objects\main.obj",
+".\Objects\ILI9341.obj",
+".\Objects\spi.obj",
+".\Objects\common.obj",
+".\Objects\watchdog.obj",
+".\Objects\sys.obj",
+".\Objects\STARTUP.obj" 
+TO ".\Objects\ms51fcBaseCode" 
+PRINT(".\Listings\ms51fcBaseCode.m51") RAMSIZE(256) 
+DISABLEWARNING (16) 
+******************************************************************************
+* RESTRICTED VERSION WITH 0800H BYTE CODE SIZE LIMIT; USED: 4F0BH BYTE (988%) *
+******************************************************************************
+Program Size: data=13.3 xdata=1361 code=21273
+LINK/LOCATE RUN COMPLETE.  0 WARNING(S),  0 ERROR(S)
+*** FATAL ERROR L250: CODE SIZE LIMIT IN RESTRICTED VERSION EXCEEDED
+    MODULE:  C:\KEIL_V5\C51\LIB\C51L.LIB (-----)
+    LIMIT:   0800H BYTES
+Target not created.
+Build Time Elapsed:  00:00:01
+</pre>
+</body>
+</html>

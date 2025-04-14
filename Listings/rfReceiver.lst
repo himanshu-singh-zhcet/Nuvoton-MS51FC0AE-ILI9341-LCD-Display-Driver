@@ -1,0 +1,624 @@
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE RFRECEIVER
+OBJECT MODULE PLACED IN .\Objects\rfReceiver.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\rfReceiver.c LARGE OPTIMIZE(8,SPEED) BROWS
+                    -E INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\rfReceiver.lst) TABS(2) OBJECT(.\Objec
+                    -ts\rfReceiver.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "uart.h"
+   4          #include "device.h"
+   5          #include "function.h"
+   6          #include "wdtConfig.h"
+   7          #include "iotfyI2c.h"
+   8          #include "uartSerial.h"
+   9          
+  10          #include "iotfyEeprom.h"
+  11          #include "mcfMotorDriver.h"
+  12          
+  13          #include "buzzer.h"
+  14          
+  15          #if (ENABLE_IOT == 1) 
+  16            #include "iotfyIot.h"
+  17          #endif
+  18          
+  19          #if (ENABLE_RF == 1)
+                #include "rfReceiver.h"
+                
+                #define RF_DATA_ARRAY         8
+                #define DEFAULT_RF_TIMEOUT_VALUE    30
+                #define DEFAULT_RF_SAVE_COUNTER_VALUE   10000// in 10 Sec = 10000 Msec
+                #define DEFAULT_RF_ONBOARDING_COUNTER   5000// 5 sec
+              
+                data volatile t_rfConfig rfConfig;
+                static volatile uint16_t hexDataParser = 0;
+                static volatile uint8_t  rfDataFound = 0;
+                static volatile uint8_t  rfTimeout = 0;
+                static volatile uint8_t  rfStage = RF_PREAMBLE_LOW;
+                static volatile uint32_t rfInterruptData = 0;
+                static volatile uint8_t  bitCount = 0;
+                
+                static volatile uint32_t rfDataArray[RF_DATA_ARRAY] = {0x00};
+                static volatile uint8_t  rfDataArrayIndex = 0;
+              
+                static volatile uint32_t rfTimeoutTimer = DEFAULT_RF_TIMEOUT_VALUE;
+                static volatile uint32_t preambleTimerCount = 0;
+                static volatile uint32_t prevRfData = 0x00000000; 
+                static volatile uint32_t rfAddressSaveCounter = 0;
+                static volatile uint8_t  saveRfAddress  = 0;
+                static volatile uint16_t previousAddress = 0;
+              
+                /*********************Extren Data**************************/
+                extern volatile fanConfig currentConfig, previousConfig;
+              
+                /********************************************************************************************************
+             -****/
+                /*                  Capture interrupt subroutine                                          */
+                /********************************************************************************************************
+             -****/
+              
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 2   
+
+                void Timer2_ISR(void) interrupt 5        // Vector @  0x2B
+                {
+                    _push_(SFRS);
+                    clr_T2CON_TF2;
+                    _pop_(SFRS);
+                }
+              
+                /********************************************************************************************************
+             -****/
+                /*                              Capture interrupt subroutine                                                */
+                /********************************************************************************************************
+             -****/
+                void Capture_ISR(void) interrupt 12
+                {
+                    _push_(SFRS);
+                    // DEBUG=0;
+                        // DEBUG1=~DEBUG1;
+                    if(CAPCON0 & 0x01) {  //Check for the flag of the Channel 0
+                      hexDataParser = 0x00;
+                      hexDataParser = C0H & 0xFF;
+                      hexDataParser = hexDataParser<<8;
+                      hexDataParser = (hexDataParser | (C0L & 0xFF));
+                      switch(rfStage) {
+                        //0x0400 -> 171.11 microsec
+                        //0x04AC -> 200 microsec
+                        //0x0400 -> 171.11 microsec
+                        //0x059C -> 240 microsec
+                        case RF_PREAMBLE_LOW: {
+                          if(hexDataParser>= 0x04AC && hexDataParser<= 0x059C) {
+                            DEBUG=1;
+                            rfStage = RF_PREAMBLE_TRAIL;
+                            break;
+                          }
+                        }
+                        break;
+                        //0x2710 -> 1671 microsec
+                        //0x1760 -> 1000 microsec
+                        case RF_PREAMBLE_TRAIL: {
+                          if(hexDataParser>= 0x1760) { 
+                            rfStage = RF_PREAMBLE_CONFIRMATION;
+                            preambleTimerCount = hexDataParser;
+                            break;
+                          }
+                          rfStage = RF_PREAMBLE_LOW;
+                        }
+                        break;
+                        //0xCF95 -> 8879 microsec
+                        //0xCF1E -> 8870 microsec
+                        //0xC6B3 -> 8500 microsec
+              
+                        case RF_PREAMBLE_CONFIRMATION: {
+                          preambleTimerCount = preambleTimerCount + hexDataParser;
+                          if(preambleTimerCount>=0xC6B3) { // 8.87 ms
+                            DEBUG=0;
+                            rfStage = RF_DATA_INITIAL_CHECK;
+                            startRfPreambleTimeoutCheck();
+                            rfInterruptData = 0x00000000;
+                          bitCount = 0;
+                          }
+                        }
+                        break;
+                        //0x0F31 -> 649.85 microsec
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 3   
+
+                        //0x1332 -> 821.129 microsec
+                        //0x0420 -> 176.457 microsec
+                        //0x0800 -> 342.22 microsec
+                        case RF_DATA_INITIAL_CHECK: {
+                          if(hexDataParser>= 0x0F31 && hexDataParser<= 0x1332) {
+                            rfStage = RF_DATA_HIGH_TRAIL_CHECK;
+                            break;
+                          }
+              
+                          if(hexDataParser>= 0x0420 && hexDataParser<= 0x0800) {
+                            rfStage = RF_DATA_LOW_TRAIL_CHECK;
+                            break;
+                          }
+                        }
+                        break;
+                        //0x105D -> 699.9819 microsec
+                        case RF_DATA_LOW_TRAIL_CHECK: {
+                          if(hexDataParser>= 0x105D) {//&& hexDataParser<= 0x132F) {
+                            rfStage = RF_DATA_INITIAL_CHECK;
+                            bitCount = bitCount + 1;
+                            rfInterruptData = rfInterruptData | 0x00;
+                            rfInterruptData = rfInterruptData<<1;
+                            break;
+                          }
+                        //resetPreambleTimerCheck();
+                          rfStage = RF_PREAMBLE_LOW;
+                        }
+                        break;
+                        //0x04E8 -> 209.877 microsec
+                        case RF_DATA_HIGH_TRAIL_CHECK: {
+                          if(hexDataParser>= 0x04E8) {//{ && hexDataParser<= 0x731) {
+                            rfStage = RF_DATA_INITIAL_CHECK;
+                            bitCount = bitCount + 1;
+                            rfInterruptData = rfInterruptData | 0x01;
+                            rfInterruptData = rfInterruptData<<1;
+                            break;
+                          }
+                          rfStage = RF_PREAMBLE_LOW;
+                        }
+                        break;
+              
+                        default: {
+              
+                        }
+                        break;
+                      }
+              
+                      if(bitCount == (NUMBER_OF_BITS_IN_PROTOCOL - 1)) {
+                        if(rfDataArrayIndex<RF_DATA_ARRAY) {
+                          rfDataArray[rfDataArrayIndex] = rfInterruptData;
+                          rfDataArrayIndex = rfDataArrayIndex + 1;
+                        }
+                        rfStage = RF_PREAMBLE_LOW;
+                        // startRfPreambleTimeoutCheck();
+                        DEBUG1=~DEBUG1;
+                        DEBUG=0;
+                        rfDataFound = 1;
+                        bitCount = 0;
+                      }
+              
+                      clr_CAPCON0_CAPF0;                  /* clear capture0 interrupt flag  */
+                      clr_T2CON_TF2;
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 4   
+
+                  }
+                    _pop_(SFRS);
+                }
+              
+                /********************************************************************************************************
+             -****
+                *                 RF Resource Init
+                *********************************************************************************************************
+             -***/
+                void initRfVars(void) {
+                  rfConfig.rfData = 0;
+                  rfConfig.rfSenderAddress = 0;
+                  rfStage = RF_PREAMBLE_LOW;
+                }
+              
+                void initInputCaptureMode() {
+                  P03_QUASI_MODE;
+                    RF_PIN = 1;
+                    P16_QUASI_MODE;
+                    DEBUG = 0;
+                    P02_QUASI_MODE;
+                    DEBUG1 = 0;
+                    TIMER2_CAP0_Capture_Mode; // Capture Mode Enabled
+                    TIMER2_DIV_4;         // If timer 2 is over Flowed...
+                    IC5_P03_CAP0_BOTHEDGE_CAPTURE; //IC5 at P03 At both Edges
+                    set_CAPCON2_ENF0;  // Enable Glitch Filter
+                    set_T2MOD_CAPCR;   // Hardware Timer 2 Auto Reload
+              
+                    set_EIE_ECAP;      //Enable Capture interrupt
+                    set_T2CON_TR2;     //Triger Timer2
+                    //ENABLE_TIMER2_INTERRUPT;
+                    ENABLE_GLOBAL_INTERRUPT;
+              
+                }
+              
+                /*Init Pin Interrupt and Timer Used in the Rf Decoding*/
+                void initRfResources(void) {
+                  initInputCaptureMode();
+                }
+                
+                void resetPreambleTimerCheck() {
+                  rfTimeoutTimer = 0;
+                }
+                
+                void startRfPreambleTimeoutCheck() {
+                  rfTimeoutTimer  = DEFAULT_RF_TIMEOUT_VALUE;
+                }
+                void rfAddressCounterSaveCheck() {
+                  if(rfAddressSaveCounter ==0) {
+                    return;
+                  }
+                  rfAddressSaveCounter--;
+                }
+                void rfTimeoutCheckHandler() {
+                  if(rfTimeoutTimer == 0) {
+                    return;
+                  }
+              
+                  rfTimeoutTimer--;
+                  if(rfTimeoutTimer == 0) {
+                    // rfStage = RF_PREAMBLE_LOW;
+                    rfDataArrayIndex = 0;
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 5   
+
+                    memset(rfDataArray, 0x00, sizeof(rfDataArray));
+                    rfTimeout = 0;
+                  }
+                }
+              
+                void checkRfTimeout(void) {
+                  rfTimeout = 1;
+                }
+              
+                uint8_t isRfTimeoutInCheck(void) {
+                  return rfTimeout;
+                }
+              
+                void saveRfReceiverData(uint16_t senderID) {
+                  uint8_t temp1 = 0;
+                  uint16_t temp2 = 0;
+              
+                  temp2 = (senderID & 0x00FF);
+                  temp1 = (senderID & 0xFF00)>>8;
+              
+                  write_EE(RF_SENDER_ID_HIGH, temp1);
+                  write_EE(RF_SENDER_ID_LOW, temp2);
+                }
+              
+                void loadRfReceiverData(void) {
+                  uint8_t  temp1 = 0;
+                  uint16_t temp2 = 0;
+              
+                  rfConfig.rfSenderAddress = 0x0000;
+              
+                  temp2 = read_EE(RF_SENDER_ID_HIGH);
+                  temp1 = read_EE(RF_SENDER_ID_LOW);
+              
+                  rfConfig.rfSenderAddress = (temp2 & 0xFF)<<8;
+                  rfConfig.rfSenderAddress = rfConfig.rfSenderAddress | (temp1 & 0xFF);
+                }
+              
+                void rfRecvHandler(void) {
+                  uint8_t  dataByte    = 0;
+                  uint8_t  rfindex   = 0;
+                  uint16_t address     = 0;
+                  uint8_t checkSum   = 0;
+                  if(rfDataFound == 0) {
+                    return;
+                  }
+              
+                  rfDataFound = 0;    
+                  rfConfig.rfData = 0x00000000;
+                  rfConfig.rfData = rfDataArray[0];
+                  address = (rfConfig.rfData & 0xFFFF0000)>>16;
+                  dataByte = (rfConfig.rfData & 0x0000FF00)>>8;
+                  checkSum =(rfConfig.rfData & 0x000000FF);
+              
+                  if(prevRfData == rfConfig.rfData) {
+                    return;
+                  }
+              
+                  prevRfData = rfConfig.rfData;
+              
+              
+                  if(dataByte==0x04){
+                    if(checkSum<0x75){
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 6   
+
+                      dataByte=0x0F;
+                    }
+                    else{
+                      dataByte=0x04;
+                    }
+                  }
+                  else if(dataByte==0x08){
+                    if(checkSum<0x79){
+                      dataByte=0x10;
+                    }
+                    else{
+                      dataByte=0x08;
+                    }
+                  }
+                  // printData(rfDataArray[0]);
+                  setRfHardware(address, dataByte);
+                  checkRfTimeout();
+                }
+              
+                void saveRFAddressInFlash(void) {
+                  if(saveRfAddress == 0) {
+                    return;
+                  }
+              
+                  saveRfAddress = 0;
+                  saveRfReceiverData(rfConfig.rfSenderAddress);
+                }
+              
+                void setRfHardware(uint16_t address, uint8_t dataByte) {
+                  uint8_t  stateUpdate = 0;
+                  uint8_t counterLoaded = 0;
+                  // printData(dataByte);
+                  switch(dataByte) {
+                      case RF_FAN_POWER_KEY : {
+                        if(address!= rfConfig.rfSenderAddress) {
+                          if(rfAddressSaveCounter!= 0) {
+                          rfAddressSaveCounter = 0;
+                          if(address == previousAddress) {
+                            saveRfAddress = 1;
+                            rfConfig.rfSenderAddress = address;
+                            setBuzzerVariables(BUZZER_RF_BIND);
+                            rfAddressSaveCounter = 0;
+                          }
+                        }else{
+                          previousAddress = address;
+                            rfAddressSaveCounter = DEFAULT_RF_SAVE_COUNTER_VALUE;
+                        }
+                        break;
+                      }
+                      if(currentConfig.fanPowerState == 1) {
+                        currentConfig.fanPowerState = 0;
+                      } else {
+                        currentConfig.fanPowerState = 1;
+                        currentConfig.powerState = 1;
+                      }
+                      stateUpdate = 1;
+                      
+                      }
+                      break;
+              
+                    case RF_SPEED_1_KEY: {
+                      if(address!= rfConfig.rfSenderAddress ) {
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 7   
+
+                        
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 1;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                    
+                    }
+                    break;
+              
+                    case RF_SPEED_2_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 2;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                      
+                    }
+                    break;
+              
+                    case RF_SPEED_3_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 3;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                    }
+                    break;
+              
+                    case RF_SPEED_4_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 4;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                      
+                    }
+                    break;
+                    
+                    case RF_SPEED_5_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 5;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                      
+                    }
+                    break;
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 8   
+
+              
+                    case RF_SPEED_6_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      currentConfig.fanSpeed = 6;
+                      currentConfig.mode = DEFAULT;
+                      stateUpdate = 1;
+                      stateUpdate = 1;
+                    }
+                    break;
+              
+                    case RF_BOOST_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                        currentConfig.fanPowerState = 1;
+                      currentConfig.mode = TURBO;
+                      stateUpdate = 1;
+                    }
+                    break;
+              
+                    
+                    case RF_SMART_KEY:{
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      if(currentConfig.fanPowerState == 1) {
+                        currentConfig.mode = ECO;
+                        stateUpdate = 1;
+                        }
+                    } 
+                    break;
+              
+                    case RF_NATURE_KEY:{
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      if(isOnboaringTimerReset()!= 0) {
+                        #if (ENABLE_IOT == 1)
+                          dvcOnboarding_t tempMode = getOnboardingMode();
+                          if(tempMode == SMART_CONFIG_ONBORDING) {
+                            tempMode = WIFI_MODE_ONBOARDING;
+                          } else {
+                            tempMode = SMART_CONFIG_ONBORDING;
+                          }
+                          setDeviceIntoOnboardingMode(tempMode);
+                          resetOnboardingTimer();
+                          break;
+                        #endif
+                      }
+                      if(currentConfig.fanPowerState == 1) {
+                        currentConfig.mode = BREEZE;
+                        stateUpdate = 1;
+                        }
+                    }
+                    break;
+              
+                    case RF_REVERSE_KEY:{
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 9   
+
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.powerState = 1;
+                      currentConfig.fanPowerState = 1;
+                      if(currentConfig.reverse){
+                        currentConfig.reverse = 0;
+                      }else{
+                        currentConfig.reverse = 1;
+                      }
+                      stateUpdate = 1;
+                    }
+                    break;
+              
+                    case RF_TIMER_ON_OFF_KEY:{
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      currentConfig.timer = 0;
+                      currentConfig.timerSec = 0;
+                      setBuzzerVariables(BUZZER_TIMER_OFF);
+                      stateUpdate = 1;
+              
+                    }break;
+              
+                    case RF_TIMER_2HR_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      if(currentConfig.fanPowerState == 1 ) {
+                        currentConfig.timer = 2* TIMER_SEC_VALUE;
+                        currentConfig.timerSec = currentConfig.timer;
+                        stateUpdate = 1;
+                      }
+                      
+                    }
+                    break;
+              
+                    case RF_TIMER_4HR_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      if(currentConfig.fanPowerState == 1) {
+                        currentConfig.timer = 4* TIMER_SEC_VALUE;
+                        currentConfig.timerSec = currentConfig.timer;
+                        stateUpdate = 1;
+                      }
+              
+                    }
+                    break;
+              
+                    case RF_TIMER_8HR_KEY: {
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      startOnboardingTimer(); 
+                      if(currentConfig.fanPowerState == 1) {
+                        currentConfig.timer = 8* TIMER_SEC_VALUE;
+                        currentConfig.timerSec = currentConfig.timer ;
+                        stateUpdate = 1;
+                      }
+                    }
+C51 COMPILER V9.60.7.0   RFRECEIVER                                                        09/12/2024 17:56:58 PAGE 10  
+
+                    break;
+                    
+              
+                    case RF_LIGHT_KEY:{
+                      if(address!= rfConfig.rfSenderAddress) {
+                        break;
+                      }
+                      if(currentConfig.light == 1) {
+                        currentConfig.light = 0;
+              
+                      } else {
+                        currentConfig.light = 1;
+                        currentConfig.powerState = 1;
+                      }
+                      stateUpdate = 1;  
+                    }
+                    break;
+              
+                    default: {    
+                      stateUpdate = 0 ;
+                    }
+                    break;
+                  
+                  }
+              
+                  if(stateUpdate == 1) {
+                    setHardwareState();
+                    stateUpdate = 0;
+                  }
+                  
+                }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

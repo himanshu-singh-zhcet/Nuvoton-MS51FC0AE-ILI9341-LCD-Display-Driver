@@ -1,0 +1,760 @@
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MCFMOTORDRIVER
+OBJECT MODULE PLACED IN .\Objects\mcfMotorDriver.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\mcfMotorDriver.c LARGE OPTIMIZE(8,SPEED) B
+                    -ROWSE INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\mcfMotorDriver.lst) TABS(2) OBJECT
+                    -(.\Objects\mcfMotorDriver.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "iotfyI2c.h"
+   4          #include "fanMasterControl.h"
+   5          #include "mcfMotorDriver.h"
+   6          #include "digismartFanConfig.h"
+   7          #include "buzzer.h"
+   8          #include "wdtConfig.h"
+   9          #include "device.h"
+  10          
+  11          
+  12          #if (ENABLE_LED == 1)
+  13              #include "led_indication.h"
+  14          #endif
+  15          
+  16          
+  17          extern data volatile tMotorConfig motorConfig;
+  18          
+  19          const uint32_t driverConfigParamsAddress[] = { 
+  20              // ISD_CONFIG_ADDR,
+  21              REV_DRIVE_CONFIG_ADDR,
+  22              MOTOR_STARTUP1_ADDR,
+  23              MOTOR_STARTUP2_ADDR,
+  24              CLOSED_LOOP1_ADDR,
+  25              CLOSED_LOOP2_ADDR,
+  26              CLOSED_LOOP3_ADDR,
+  27              CLOSED_LOOP4_ADDR,
+  28              SPEED_PROFILES1_ADDR,
+  29              SPEED_PROFILES2_ADDR,
+  30              SPEED_PROFILES3_ADDR,
+  31              SPEED_PROFILES4_ADDR,
+  32              SPEED_PROFILES5_ADDR,
+  33              SPEED_PROFILES6_ADDR,
+  34              FAULT_CONFIG1_ADDR,
+  35              FAULT_CONFIG2_ADDR,
+  36              INT_ALGO_1_ADDR,
+  37              INT_ALGO_2_ADDR,
+  38              PIN_CONFIG_ADDR,
+  39              DEVICE_CONFIG1_ADDR,
+  40              DEVICE_CONFIG2_ADDR,
+  41              PERI_CONFIG1_ADDR,
+  42              GD_CONFIG1_ADDR,
+  43              GD_CONFIG2_ADDR,
+  44              EEPROM_WRITE_ACCESS_ADDR,
+  45          };
+  46          const uint32_t driverConfigParamsValue[] = {
+  47              // ISD_CONFIG_VALUE,
+  48              REV_DRIVE_CONFIG_VALUE,
+  49              MOTOR_STARTUP1_VALUE,
+  50              MOTOR_STARTUP2_VALUE,
+  51              CLOSED_LOOP1_VALUE,
+  52              CLOSED_LOOP2_VALUE,
+  53              CLOSED_LOOP3_VALUE,
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 2   
+
+  54              CLOSED_LOOP4_VALUE,
+  55              SPEED_PROFILES1_VALUE,
+  56              SPEED_PROFILES2_VALUE,
+  57              SPEED_PROFILES3_VALUE,
+  58              SPEED_PROFILES4_VALUE,
+  59              SPEED_PROFILES5_VALUE,
+  60              SPEED_PROFILES6_VALUE,
+  61              FAULT_CONFIG1_VALUE,
+  62              FAULT_CONFIG2_VALUE,
+  63              INT_ALGO_1_VALUE,
+  64              INT_ALGO_2_VALUE,
+  65              PIN_CONFIG_VALUE,
+  66              DEVICE_CONFIG1_VALUE,
+  67              DEVICE_CONFIG2_VALUE,
+  68              PERI_CONFIG1_VALUE,
+  69              GD_CONFIG1_VALUE,
+  70              GD_CONFIG2_VALUE,
+  71              EEPROM_WRITE_ACCESS_VALUE,
+  72          };
+  73          
+  74          
+  75          static void delayCycle(uint16_t us) {
+  76   1          int i = 0;
+  77   1          for(i = 0; i<us; i++) {
+  78   2              _nop_();
+  79   2          }
+  80   1      }
+  81          
+  82          unsigned char Crc8Atm(unsigned char *buf, unsigned char len) {
+  83   1          unsigned char i, j;
+  84   1          uint8_t crc = 0xff;
+  85   1          for (i = 0; i < len; i++) {
+  86   2              crc ^= buf[i];
+  87   2              for (j = 0; j < 8; j++) {
+  88   3                  if ((crc & 0x80) != 0) {
+  89   4                      crc = (uint8_t)((crc << 1) ^ POLY_CONST);
+  90   4                  } else {
+  91   4                      crc <<= 1;
+  92   4                  }
+  93   3              }
+  94   2          }
+  95   1          return crc;
+  96   1      }
+  97          
+  98          unsigned char mcf_read32(uint8_t mcfAddr, uint32_t addr, uint32_t *result) {
+  99   1          unsigned char crcCheck[9] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+ 100   1          unsigned char calcCRC = 0;
+ 101   1          uint8_t  crc = 0;
+ 102   1          uint8_t  value = 0x00;
+ 103   1          uint32_t rslt = 0;
+ 104   1          uint8_t  errorStage = 0;
+ 105   1          
+ 106   1          // Construct the 24 bit control word (refer to sendDataheet section 7.6.2.1)
+ 107   1          unsigned char control_word[3];
+ 108   1          control_word[0] =  0xD0;
+ 109   1          control_word[1] = (addr&0x00000F00)>>8;
+ 110   1          control_word[2] =  addr&0x000000FF;
+ 111   1      
+ 112   1          if(!I2C_start()) { // Send Start condition
+ 113   2              errorStage = 1;
+ 114   2              goto readEnd;
+ 115   2          }                  
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 3   
+
+ 116   1      
+ 117   1          crcCheck[0] = ((mcfAddr << 1) & CLR_BIT0);
+ 118   1      
+ 119   1          if(!(I2CSendSlaveWriteStart(mcfAddr))) {
+ 120   2              errorStage = 1;
+ 121   2              goto readEnd;
+ 122   2          }
+ 123   1      
+ 124   1          delayCycle(INTERBYTE_DELAY);
+ 125   1      
+ 126   1          crcCheck[1] = (control_word[0]);
+ 127   1      
+ 128   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 129   1          if(!(I2C_WriteData(control_word[0])))  {
+ 130   2              errorStage = 1;
+ 131   2              goto readEnd;
+ 132   2          }
+ 133   1      
+ 134   1          delayCycle(INTERBYTE_DELAY);
+ 135   1      
+ 136   1          crcCheck[2] = (control_word[1]);
+ 137   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 138   1          if(!(I2C_WriteData(control_word[1]))) {
+ 139   2              errorStage = 1;
+ 140   2              goto readEnd;
+ 141   2          }
+ 142   1          delayCycle(INTERBYTE_DELAY);
+ 143   1      
+ 144   1          crcCheck[3] = (control_word[2]);
+ 145   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 146   1          if(!(I2C_WriteData(control_word[2]))) {
+ 147   2              errorStage = 1;
+ 148   2              goto readEnd;
+ 149   2          }
+ 150   1          delayCycle(INTERBYTE_DELAY);
+ 151   1         
+ 152   1          crcCheck[4] = ((mcfAddr << 1) | SET_BIT0);
+ 153   1          //if(!sendRepeatStart()) {
+ 154   1          // if(!sendRepeatStart()) {
+ 155   1          //     errorStage = 1;
+ 156   1          //     goto readEnd;
+ 157   1          // }
+ 158   1      
+ 159   1          I2C_stop();
+ 160   1          if(!I2C_start()) { // Send Start condition
+ 161   2              errorStage = 1;
+ 162   2              goto readEnd;
+ 163   2          }
+ 164   1          
+ 165   1          if(!I2CSendSlaveRead(mcfAddr)) {
+ 166   2              errorStage = 1;
+ 167   2              goto readEnd;
+ 168   2          }
+ 169   1          delayCycle(INTERBYTE_DELAY);
+ 170   1          
+ 171   1          if(!I2C_Read_Ack(&value)) {
+ 172   2              errorStage = 1;
+ 173   2              goto readEnd;
+ 174   2          }
+ 175   1          crcCheck[5] = value;
+ 176   1          rslt |= value;
+ 177   1          delayCycle(INTERBYTE_DELAY);
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 4   
+
+ 178   1      
+ 179   1          if(!I2C_Read_Ack(&value)) {
+ 180   2              errorStage = 1;
+ 181   2              goto readEnd;
+ 182   2          }
+ 183   1          crcCheck[6] = value;
+ 184   1          rslt |= ((uint32_t)value)<<8;
+ 185   1          delayCycle(INTERBYTE_DELAY);
+ 186   1      
+ 187   1          if(!I2C_Read_Ack(&value)) {
+ 188   2              errorStage = 1;
+ 189   2              goto readEnd;
+ 190   2          }
+ 191   1          crcCheck[7] = value;
+ 192   1          rslt |= ((uint32_t)value)<<16;
+ 193   1          delayCycle(INTERBYTE_DELAY);
+ 194   1      
+ 195   1          if(!I2C_Read_Ack(&value)) {
+ 196   2              errorStage = 1;
+ 197   2              goto readEnd;
+ 198   2          }
+ 199   1          crcCheck[8] = value;
+ 200   1          rslt |= ((uint32_t)value)<<24;
+ 201   1          delayCycle(INTERBYTE_DELAY);
+ 202   1      
+ 203   1          if(!I2C_Read_Ack(&value)) {
+ 204   2              errorStage = 1;
+ 205   2              goto readEnd;
+ 206   2          }
+ 207   1          crc = value; 
+ 208   1          delayCycle(INTERBYTE_DELAY);
+ 209   1      
+ 210   1          if(!I2C_Read_Nack(&value)) {
+ 211   2              errorStage = 1;
+ 212   2              goto readEnd;
+ 213   2          }
+ 214   1      
+ 215   1          //Compare Crc Here if Needed
+ 216   1          *result = rslt;
+ 217   1      
+ 218   1          readEnd:
+ 219   1          delayCycle(INTERBYTE_DELAY);
+ 220   1          if(errorStage) {
+ 221   2              *result = 0x00;
+ 222   2              I2C_SI_Check();
+ 223   2              I2C_stop();
+ 224   2              return false;
+ 225   2          }
+ 226   1          
+ 227   1          I2C_stop();
+ 228   1          return true;
+ 229   1      }
+ 230          
+ 231          //Time Around 4.6 mSec
+ 232          unsigned char mcf_write32(uint8_t mcfAddr, uint32_t addr, uint32_t sendData) {
+ 233   1          // Construct the 24 bit control word (refer to sendDataheet section 7.6.2.1)
+ 234   1          unsigned char crcCheckArr[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} ;
+ 235   1          unsigned char crc = 0x00;
+ 236   1          unsigned char control_word[3];
+ 237   1          uint8_t errorStage = 0;
+ 238   1          control_word[0] = 0x50;
+ 239   1          control_word[1] = (addr&0x00000F00)>>8;
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 5   
+
+ 240   1          control_word[2] = addr&0x000000FF;
+ 241   1      
+ 242   1          // Send Start condition
+ 243   1          if(!I2C_start()) { // Send Start condition
+ 244   2              errorStage = 1;
+ 245   2              goto writeEnd;
+ 246   2          }
+ 247   1      
+ 248   1          crcCheckArr[0] = ((mcfAddr << 1) & CLR_BIT0);
+ 249   1      
+ 250   1          if(!(I2CSendSlaveWriteStart(mcfAddr))) {
+ 251   2              errorStage = 1;
+ 252   2              goto writeEnd;
+ 253   2          }
+ 254   1      
+ 255   1          delayCycle(INTERBYTE_DELAY);
+ 256   1          crcCheckArr[1] = control_word[0];
+ 257   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 258   1          if(!(I2C_WriteData(crcCheckArr[1]))) {
+ 259   2              errorStage = 1;
+ 260   2              goto writeEnd;
+ 261   2          }
+ 262   1      
+ 263   1          delayCycle(INTERBYTE_DELAY);
+ 264   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 265   1          crcCheckArr[2] = control_word[1];
+ 266   1          if(!(I2C_WriteData(crcCheckArr[2]))) {
+ 267   2              errorStage = 1;
+ 268   2              goto writeEnd;
+ 269   2          }
+ 270   1      
+ 271   1          delayCycle(INTERBYTE_DELAY);
+ 272   1      
+ 273   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 274   1          crcCheckArr[3] = control_word[2];
+ 275   1          if(!(I2C_WriteData(crcCheckArr[3]))) {
+ 276   2              errorStage = 1;
+ 277   2              goto writeEnd;
+ 278   2          }
+ 279   1      
+ 280   1          delayCycle(INTERBYTE_DELAY);
+ 281   1      
+ 282   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 283   1          crcCheckArr[4] = (sendData & 0x000000FF);
+ 284   1          if(!(I2C_WriteData(crcCheckArr[4]))) {
+ 285   2              errorStage = 1;
+ 286   2              goto writeEnd;
+ 287   2          }
+ 288   1      
+ 289   1          delayCycle(INTERBYTE_DELAY);
+ 290   1      
+ 291   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 292   1          crcCheckArr[5] = (sendData & 0x0000FF00)>>8;
+ 293   1          if(!(I2C_WriteData(crcCheckArr[5]))) {
+ 294   2              errorStage = 1;
+ 295   2              goto writeEnd;
+ 296   2          }
+ 297   1      
+ 298   1          delayCycle(INTERBYTE_DELAY);
+ 299   1      
+ 300   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 301   1          crcCheckArr[6] = (sendData & 0x00FF0000)>>16;
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 6   
+
+ 302   1          if(!(I2C_WriteData(crcCheckArr[6]))) {
+ 303   2              errorStage = 1;
+ 304   2              goto writeEnd;
+ 305   2          }
+ 306   1      
+ 307   1          delayCycle(INTERBYTE_DELAY);
+ 308   1      
+ 309   1          // Send data and check I2C_ACK state, return 0 is received I2C_ACK
+ 310   1          crcCheckArr[7] = (sendData & 0xFF000000)>>24;
+ 311   1          if(!(I2C_WriteData(crcCheckArr[7]))) {
+ 312   2              errorStage = 1;
+ 313   2              goto writeEnd;
+ 314   2          }
+ 315   1      
+ 316   1          crc = Crc8Atm(crcCheckArr, 8);
+ 317   1      
+ 318   1          if(!(I2C_WriteData(crc))) {
+ 319   2              errorStage = 1;
+ 320   2              goto writeEnd;
+ 321   2          }
+ 322   1          writeEnd:
+ 323   1          delayCycle(INTERBYTE_DELAY);
+ 324   1          if(errorStage) {
+ 325   2              I2C_SI_Check();
+ 326   2              I2C_stop();
+ 327   2              return false;
+ 328   2          }
+ 329   1      
+ 330   1          I2C_stop();             // Send Stop condition
+ 331   1          return true;
+ 332   1      }
+ 333          
+ 334          void initDriverParamVars(void) {
+ 335   1          motorConfig.mcfAddress          = 0x00;
+ 336   1          motorConfig.driverStage         = ADDRESS_CHECK_WAIT_STAGE;
+ 337   1          motorConfig.registerWriteTimout = I2C_INIT_WAIT_TIME;
+ 338   1          motorConfig.driverStatus        = NOT_IDLE;
+ 339   1      }
+ 340          
+ 341          uint8_t checkResParam(uint32_t temp) {
+ 342   1          uint32_t temp1 = 0x00000000;
+ 343   1          uint32_t temp2 = 0x00000000;
+ 344   1      
+ 345   1          temp1 = (temp & 0x0000FF00);
+ 346   1          temp1 = temp1>>8;
+ 347   1          temp2 = (CLOSED_LOOP2_VALUE & 0x0000FF00);
+ 348   1          temp2 = temp2>>8;
+ 349   1      
+ 350   1          if(temp2!= temp1) {
+ 351   2              return false;
+ 352   2          }
+ 353   1          return true;
+ 354   1      }
+ 355          
+ 356          uint8_t checkIndParam(uint32_t temp) {
+ 357   1          uint32_t temp1 = 0x00000000;
+ 358   1          uint32_t temp2 = 0x00000000;
+ 359   1          
+ 360   1          temp1 = (temp & 0x000000FF);
+ 361   1          temp2 = (CLOSED_LOOP2_VALUE & 0x000000FF);
+ 362   1          if(temp2!= temp1) {
+ 363   2              return false;
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 7   
+
+ 364   2          }
+ 365   1          return true;
+ 366   1      }
+ 367          
+ 368          uint8_t checkBackEmf(uint32_t  temp) {
+ 369   1          uint32_t temp1 = 0x00000000;
+ 370   1          uint32_t temp2 = 0x00000000;
+ 371   1          
+ 372   1          temp1 = (temp & 0x7F800000);
+ 373   1          temp2 = (CLOSED_LOOP3_VALUE & 0x7F800000);
+ 374   1          if(temp2!= temp1) {
+ 375   2              return false;
+ 376   2          }
+ 377   1          return true;
+ 378   1      }
+ 379          
+ 380          uint8_t checkMaxSpeed(uint32_t temp) {
+ 381   1          uint32_t temp1 = 0x00000000;
+ 382   1          uint32_t temp2 = 0x00000000;
+ 383   1          
+ 384   1          temp1 = (temp & 0x00003FFF);
+ 385   1          temp2 = (CLOSED_LOOP4_VALUE & 0x00003FFF);
+ 386   1          if(temp2!= temp1) {
+ 387   2              return false;
+ 388   2          }
+ 389   1          return true;
+ 390   1      }
+ 391          
+ 392          uint8_t isMotorDriverConfigCheckOver(void) {
+ 393   1          if(motorConfig.driverStage == CONFIG_OVER_STAGE) {
+ 394   2              return true;
+ 395   2          }
+ 396   1          return false;
+ 397   1      }
+ 398          
+ 399          void setMCFAddress(uint8_t newMcfAddr, uint32_t *tempReg) {
+ 400   1          uint32_t temp1 = 0x00000000;
+ 401   1          uint32_t temp2 = 0x00000000;
+ 402   1          
+ 403   1          temp1 = (DEVICE_CONFIG1_VALUE & 0xFF0FFFFF); // Reset Slave Address
+ 404   1        temp2 = newMcfAddr;
+ 405   1          temp2 = (temp2 <<20);
+ 406   1          
+ 407   1          temp1 = (temp1 | temp2);
+ 408   1          *tempReg = temp1;
+ 409   1      }
+ 410          void writeWaitTime(void){
+ 411   1          int i=0;
+ 412   1          for(i=0;i<10000;i++);
+ 413   1      }
+ 414          void driverParamsHandler() {
+ 415   1          uint8_t  state    = 0;
+ 416   1          uint32_t tempData = 0;
+ 417   1          uint8_t  ret1     = 0;
+ 418   1        uint8_t  ret2     = 0;
+ 419   1          uint8_t  speedChangeFlag = 0;
+ 420   1          uint32_t tempSpeed = 0;
+ 421   1      
+ 422   1          switch(motorConfig.driverStage) {
+ 423   2              case ADDRESS_CHECK_WAIT_STAGE: {
+ 424   3      
+ 425   3              }
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 8   
+
+ 426   2              break;
+ 427   2      
+ 428   2              case ADDRESS_CHECK_STAGE: {
+ 429   3                  ret1 = mcf_read32(motorConfig.mcfAddress, ALGORITHMN_STATE, &tempData);
+ 430   3                  if(ret1 == 0) {
+ 431   4                      motorConfig.mcfAddress = motorConfig.mcfAddress + 1;
+ 432   4                      motorConfig.registerWriteTimout = I2C_READBACK_TIME;
+ 433   4                      motorConfig.driverStage         = ADDRESS_CHECK_WAIT_STAGE;
+ 434   4                  } else {
+ 435   4                      motorConfig.registerWriteTimout = I2C_READBACK_TIME;
+ 436   4                      motorConfig.driverStage         = INIT_STAGE;
+ 437   4                  }
+ 438   3              }
+ 439   2              break;
+ 440   2      
+ 441   2              case INIT_STAGE: {
+ 442   3                  motorConfig.driverStatus = NOT_IDLE;
+ 443   3                  motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 444   3                  motorConfig.driverStage = CHECK_RES_INDUC_WAIT_STAGE;
+ 445   3              }
+ 446   2              break;
+ 447   2      
+ 448   2              case CHECK_RES_INDUC_WAIT_STAGE: {
+ 449   3                  
+ 450   3              }
+ 451   2              break;
+ 452   2      
+ 453   2              case CHECK_RES_INDUC_STAGE: {
+ 454   3      
+ 455   3                  state = mcf_read32(motorConfig.mcfAddress, MTR_RES_INDU_ADDR, &tempData);
+ 456   3                  if(state == true) {
+ 457   4                      ret1 = checkResParam(tempData);
+ 458   4                      ret2 = checkIndParam(tempData);
+ 459   4                      if((ret1 == 0) || (ret2 == 0)) {
+ 460   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 461   5                          motorConfig.driverStage = ISD_CONFIG_WAIT_STAGE;
+ 462   5                      } else {
+ 463   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 464   5                          motorConfig.driverStage = CHECK_BACK_EMF_WAIT_STAGE;
+ 465   5                      }
+ 466   4                  } else {
+ 467   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 468   4                      motorConfig.driverStage = CHECK_RES_INDUC_WAIT_STAGE;
+ 469   4                  }
+ 470   3              }
+ 471   2              break;
+ 472   2      
+ 473   2              case CHECK_BACK_EMF_WAIT_STAGE: {
+ 474   3      
+ 475   3              }
+ 476   2              break;
+ 477   2      
+ 478   2              case CHECK_BACK_EMF_STAGE: {
+ 479   3                  state = mcf_read32(motorConfig.mcfAddress, MTR_BACK_EMF_ADDR, &tempData);
+ 480   3                  if(state == true) {
+ 481   4                      ret1 = checkBackEmf(tempData);
+ 482   4                      if(ret1 == 0) {
+ 483   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 484   5                          motorConfig.driverStage = CHECK_BACK_EMF_WAIT_STAGE;
+ 485   5                      } else {
+ 486   5                          motorConfig.registerWriteTimout = I2C_EEPROM_WAIT_TIME;
+ 487   5                          motorConfig.driverStage = CHECK_MOTOR_SPEED_WAIT_STAGE;
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 9   
+
+ 488   5                      }
+ 489   4                  }  else {
+ 490   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 491   4                      motorConfig.driverStage = CHECK_BACK_EMF_WAIT_STAGE;
+ 492   4                  }
+ 493   3              }
+ 494   2              break;
+ 495   2      
+ 496   2              case CHECK_MOTOR_SPEED_WAIT_STAGE: {
+ 497   3      
+ 498   3              }
+ 499   2              break;
+ 500   2      
+ 501   2              case CHECK_MOTOR_SPEED_STAGE: {
+ 502   3                  state = mcf_read32(motorConfig.mcfAddress, MTR_MECHANICAL_PARAM, &tempData);
+ 503   3                  if(state == true) {
+ 504   4                      ret1 = checkMaxSpeed(tempData);
+ 505   4                      if(ret1 == 0) {
+ 506   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 507   5                          motorConfig.driverStage = ISD_CONFIG_WAIT_STAGE;
+ 508   5                      } else {
+ 509   5                          motorConfig.registerWriteTimout = I2C_EEPROM_WAIT_TIME;
+ 510   5                          motorConfig.driverStage = CONFIG_OVER_WAIT_STAGE;
+ 511   5                      }
+ 512   4                  } else {
+ 513   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 514   4                      motorConfig.driverStage = CHECK_MOTOR_SPEED_WAIT_STAGE;
+ 515   4                  }
+ 516   3              }
+ 517   2              break;
+ 518   2      
+ 519   2              case ISD_CONFIG_WAIT_STAGE: {
+ 520   3                  if(motorConfig.driverStatus == IDLE) {
+ 521   4                      break;
+ 522   4                  }
+ 523   3                  // setBuzzerVariables(BUZZER_ON_CONFIG_UPDATE);
+ 524   3                  speedChangeFlag = 1;
+ 525   3                  tempSpeed = 0;
+ 526   3                  motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 527   3                  motorConfig.driverStage = ISD_IDLE_WAIT_STAGE;
+ 528   3              }
+ 529   2              break;
+ 530   2      
+ 531   2              case ISD_IDLE_WAIT_STAGE: {
+ 532   3      
+ 533   3              };
+ 534   2              break;
+ 535   2              
+ 536   2              case ISD_IDLE_STAGE: { 
+ 537   3                  state = mcf_read32(motorConfig.mcfAddress, ALGORITHMN_STATE, &tempData);
+ 538   3                  if(state == 1) {
+ 539   4                      ret1 = tempData & 0x0000FFFF;
+ 540   4                      if(ret1 == 0x00) {
+ 541   5                          motorConfig.driverStatus = IDLE;
+ 542   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 543   5                          motorConfig.driverStage = ISD_CONFIG_STAGE; 
+ 544   5                      } else {
+ 545   5                          motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 546   5                          motorConfig.driverStage = ISD_IDLE_WAIT_STAGE;
+ 547   5                      }
+ 548   4                  } else {
+ 549   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 10  
+
+ 550   4                      motorConfig.driverStage = ISD_IDLE_WAIT_STAGE;
+ 551   4                  }
+ 552   3              }
+ 553   2              break;
+ 554   2      
+ 555   2              case ISD_CONFIG_STAGE: {
+ 556   3                  state = mcf_write32(motorConfig.mcfAddress, ISD_CONFIG_ADDR, ISD_CONFIG_VALUE);
+ 557   3                  if(state == true) {
+ 558   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 559   4                      motorConfig.driverStage = REV_DRIVE_WAIT_STAGE;
+ 560   4                  } else {
+ 561   4                      motorConfig.registerWriteTimout = I2C_WRITE_WAIT_TIME;
+ 562   4                      motorConfig.driverStage = ISD_CONFIG_WAIT_STAGE;
+ 563   4                  }
+ 564   3      
+ 565   3              }
+ 566   2              break;
+ 567   2      
+ 568   2              case REV_DRIVE_WAIT_STAGE:{
+ 569   3      
+ 570   3              }
+ 571   2              break;
+ 572   2      
+ 573   2              case REV_DRIVE_STAGE:{
+ 574   3              uint8_t i = 0;
+ 575   3                  while(i<24){
+ 576   4                      state = mcf_write32(motorConfig.mcfAddress, driverConfigParamsAddress[i], driverConfigPara
+             -msValue[i]);
+ 577   4                      writeWaitTime();
+ 578   4                      resetWatchDog();
+ 579   4                      if(state == 1) {
+ 580   5                          i++;
+ 581   5                      }  
+ 582   4                  }
+ 583   3                  setBuzzerVariables(BUZZER_BEEP);
+ 584   3                  // setBuzzerVariables(BUZZER_BEEP);
+ 585   3                  motorConfig.registerWriteTimout = I2C_EEPROM_WAIT_TIME;
+ 586   3                  motorConfig.driverStage = CONFIG_OVER_WAIT_STAGE; 
+ 587   3      
+ 588   3              }
+ 589   2              break;
+ 590   2      
+ 591   2              case CONFIG_OVER_WAIT_STAGE:{
+ 592   3                  // setBuzzerVariables(BUZZER_BEEP);
+ 593   3              }
+ 594   2              break;
+ 595   2      
+ 596   2              case CONFIG_OVER_STAGE:{
+ 597   3                  
+ 598   3              }
+ 599   2              break;
+ 600   2      
+ 601   2              default: {
+ 602   3      
+ 603   3              }
+ 604   2              break;
+ 605   2          }
+ 606   1      
+ 607   1          if(speedChangeFlag == 1) {
+ 608   2              setPWMSpeed(0);
+ 609   2          }
+ 610   1      }
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 11  
+
+ 611          
+ 612          void driverTimeHandler() {
+ 613   1          uint8_t state = 0;
+ 614   1      
+ 615   1          if(motorConfig.driverStage == CONFIG_OVER_STAGE) {
+ 616   2              return;
+ 617   2          }
+ 618   1          
+ 619   1          if(motorConfig.registerWriteTimout!= 0) {
+ 620   2              motorConfig.registerWriteTimout--;
+ 621   2              if(motorConfig.registerWriteTimout == 0) {
+ 622   3                  switch(motorConfig.driverStage) {
+ 623   4                      
+ 624   4                      case ADDRESS_CHECK_WAIT_STAGE: {
+ 625   5                          motorConfig.driverStage = ADDRESS_CHECK_STAGE;
+ 626   5                      }
+ 627   4                      break;
+ 628   4      
+ 629   4                      case ADDRESS_CHECK_STAGE: {
+ 630   5      
+ 631   5                      } 
+ 632   4                      break;
+ 633   4      
+ 634   4                      case INIT_STAGE:{
+ 635   5      
+ 636   5                      }
+ 637   4                      break;
+ 638   4      
+ 639   4                      case CHECK_RES_INDUC_WAIT_STAGE:{
+ 640   5                          motorConfig.driverStage = CHECK_RES_INDUC_STAGE;
+ 641   5                      }
+ 642   4                      break;
+ 643   4      
+ 644   4                      case CHECK_RES_INDUC_STAGE:{
+ 645   5      
+ 646   5                      }
+ 647   4                      break;
+ 648   4      
+ 649   4                      case CHECK_BACK_EMF_WAIT_STAGE:{
+ 650   5                          motorConfig.driverStage = CHECK_BACK_EMF_STAGE;
+ 651   5                      }
+ 652   4                      break;
+ 653   4      
+ 654   4                      case CHECK_BACK_EMF_STAGE:{
+ 655   5      
+ 656   5                      }
+ 657   4                      break;
+ 658   4      
+ 659   4                      case CHECK_MOTOR_SPEED_WAIT_STAGE: {
+ 660   5                          motorConfig.driverStage = CHECK_MOTOR_SPEED_STAGE;
+ 661   5                      }
+ 662   4                      break;
+ 663   4      
+ 664   4                      case CHECK_MOTOR_SPEED_STAGE: {
+ 665   5                      }
+ 666   4      
+ 667   4                      case ISD_CONFIG_WAIT_STAGE:{
+ 668   5                          
+ 669   5                      }
+ 670   4                      break;
+ 671   4      
+ 672   4                      case ISD_IDLE_WAIT_STAGE: {
+C51 COMPILER V9.60.7.0   MCFMOTORDRIVER                                                    09/12/2024 17:56:57 PAGE 12  
+
+ 673   5                          motorConfig.driverStage = ISD_IDLE_STAGE;
+ 674   5                      };
+ 675   4                      break;
+ 676   4                      
+ 677   4                      case ISD_IDLE_STAGE: {
+ 678   5                          
+ 679   5                      }
+ 680   4                      break;
+ 681   4      
+ 682   4                      case ISD_CONFIG_STAGE:{
+ 683   5      
+ 684   5                      }
+ 685   4                      break;
+ 686   4      
+ 687   4                      case REV_DRIVE_WAIT_STAGE:{
+ 688   5                          motorConfig.driverStage = REV_DRIVE_STAGE;
+ 689   5                      }
+ 690   4                      break;
+ 691   4      
+ 692   4                      case REV_DRIVE_STAGE:{
+ 693   5      
+ 694   5                      }
+ 695   4                      break;
+ 696   4      
+ 697   4                      case CONFIG_OVER_WAIT_STAGE:{
+ 698   5                          motorConfig.driverStage = CONFIG_OVER_STAGE;
+ 699   5      
+ 700   5                      }
+ 701   4                      break;
+ 702   4      
+ 703   4                      case CONFIG_OVER_STAGE:{
+ 704   5                      }
+ 705   4                      break;
+ 706   4      
+ 707   4                      default: 
+ 708   4                      break;
+ 709   4                  }
+ 710   3              }
+ 711   2          }
+ 712   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2548    ----
+   CONSTANT SIZE    =     17    ----
+   XDATA SIZE       =    192     128
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

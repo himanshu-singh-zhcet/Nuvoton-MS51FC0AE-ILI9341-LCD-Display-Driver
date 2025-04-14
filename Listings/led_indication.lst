@@ -1,0 +1,109 @@
+C51 COMPILER V9.60.7.0   LED_INDICATION                                                    09/12/2024 17:56:59 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE LED_INDICATION
+OBJECT MODULE PLACED IN .\Objects\led_indication.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\led_indication.c LARGE OPTIMIZE(8,SPEED) B
+                    -ROWSE INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\led_indication.lst) TABS(2) OBJECT
+                    -(.\Objects\led_indication.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "device.h"
+   4          
+   5          #if (ENABLE_LED == 1)
+   6            
+   7            #include "led_indication.h"
+   8          
+   9            volatile uint8_t  enableLed = 0;
+  10            volatile uint8_t  numberOfLedBlink = 0;
+  11            volatile uint16_t ledTimeCount = 0;
+  12            volatile uint16_t ledBlinkGap = 0;
+  13            volatile uint16_t ledBlinkDuration = 0;
+  14            
+  15            /*********************Extren Data**************************/
+  16            extern volatile fanConfig currentConfig, previousConfig;
+  17            void initLed() {
+  18   1          enableLed = 0;
+  19   1          numberOfLedBlink = 0;
+  20   1          ledTimeCount = 0;
+  21   1          ledBlinkGap = 0;
+  22   1          ledBlinkDuration = 0;
+  23   1          P05_PUSHPULL_MODE;
+  24   1          P05 = 0;
+  25   1        }
+  26          
+  27            void setLedVariables(unsigned char enable, unsigned char numberofBlink, unsigned int BlinkDuration, unsig
+             -ned int BlinkGap) {
+  28   1          // if(currentConfig.light){
+  29   1          //  return;
+  30   1          // }
+  31   1          enableLed = enable;
+  32   1          numberOfLedBlink = numberofBlink;
+  33   1          ledBlinkDuration = BlinkDuration;
+  34   1          ledBlinkGap = BlinkGap;
+  35   1          if(enable == 0) {
+  36   2            LED_PIN = LED_PIN_OFF;
+  37   2          }
+  38   1         }
+  39          
+  40            void setLedInterruptVariables(unsigned char enable, unsigned char numberofBlink, unsigned int BlinkDurati
+             -on, unsigned int BlinkGap) {
+  41   1          enableLed = enable;
+  42   1          numberOfLedBlink = numberofBlink;
+  43   1          ledBlinkDuration = BlinkDuration;
+  44   1          ledBlinkGap = BlinkGap;
+  45   1          if(enable == 0) {
+  46   2            LED_PIN = LED_PIN_OFF;
+  47   2          }
+  48   1        }
+  49          
+  50            void ledHandler(void) { 
+  51   1          if(enableLed == 0) {
+C51 COMPILER V9.60.7.0   LED_INDICATION                                                    09/12/2024 17:56:59 PAGE 2   
+
+  52   2            if(currentConfig.light){
+  53   3              LED_PIN = LED_PIN_ON;
+  54   3            }else{
+  55   3              LED_PIN = LED_PIN_OFF;
+  56   3            }
+  57   2            return;
+  58   2          }
+  59   1      
+  60   1          ledTimeCount++;
+  61   1          if (numberOfLedBlink == 0) {
+  62   2            enableLed = 0;
+  63   2              ledTimeCount = 0;
+  64   2              LED_PIN = LED_PIN_OFF;
+  65   2          }
+  66   1          
+  67   1          if (numberOfLedBlink > 0) {
+  68   2            if ((ledTimeCount < ledBlinkDuration) && (!LED_PIN)) {
+  69   3              LED_PIN = LED_PIN_ON;
+  70   3            }
+  71   2            
+  72   2            if ((ledTimeCount >= ledBlinkDuration) && (LED_PIN)) {
+  73   3              LED_PIN = LED_PIN_OFF;
+  74   3            } else if (ledTimeCount >= ledBlinkDuration + ledBlinkGap) {
+  75   3              ledTimeCount = 0;
+  76   3                numberOfLedBlink -= 1;
+  77   3            }
+  78   2          } 
+  79   1        }
+  80          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    273    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      8      12
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

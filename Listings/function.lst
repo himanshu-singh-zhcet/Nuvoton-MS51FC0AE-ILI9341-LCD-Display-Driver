@@ -1,0 +1,624 @@
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE FUNCTION
+OBJECT MODULE PLACED IN .\Objects\function.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\function.c LARGE OPTIMIZE(8,SPEED) BROWSE 
+                    -INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\function.lst) TABS(2) OBJECT(.\Objects\f
+                    -unction.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "uart.h"
+   4          #include "device.h"
+   5          #include "buzzer.h"
+   6          #include "function.h"
+   7          #include "wdtConfig.h"
+   8          #include "uartSerial.h"
+   9          #include "iotfyEeprom.h"
+  10          
+  11          #if (ENABLE_IOT == 1) 
+  12            #include "iotfyIot.h"
+  13          #endif
+  14          #if (ENABLE_LED == 1)
+  15            #include "led_indication.h"
+  16          #endif
+  17          /********* For Motor control **********/
+  18          #include "fanMasterControl.h"
+  19          /**************************************/
+  20          
+  21          extern volatile fanConfig currentConfig, previousConfig;
+  22          
+  23          extern volatile uint32_t fanPWM;
+  24          extern volatile uint32_t targetFanRPM;
+  25          extern volatile uint8_t fanDirection;
+  26          
+  27          /******************TSOP RELATED************************/
+  28          #if(ENABLE_TSOP==1)
+  29            extern volatile uint32_t bitPattern;        
+  30            extern volatile uint8_t  irPulseTime;       
+  31            extern volatile uint8_t  msCount;
+  32            extern volatile int      pulseCount;
+  33            extern volatile uint32_t IRkey;
+  34          #endif
+  35          
+  36          /******************HARDWARE RELATED************************/
+  37          extern volatile uint8_t  configChanged;
+  38          extern volatile uint16_t oneSecCount;
+  39          extern volatile uint8_t  oneSecFlag;
+  40          
+  41          #if (ENABLE_IOT == 1) 
+  42            extern volatile uint8_t iotfySerialUpdateFlag;
+  43          #endif
+  44          
+  45          volatile uint16_t onboaringCounter = 0;
+  46          volatile uint8_t onboardingStartFlag = 0;
+  47          
+  48          
+  49          /******************LED************************************/
+  50          extern volatile uint16_t mbiRegister;
+  51          extern volatile uint8_t  wifiLEDBlink;
+  52          extern volatile uint8_t  iotfyNetwork;
+  53          extern volatile uint8_t  iotfyNetworkUpdateFlag;
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 2   
+
+  54          
+  55          uint16_t winterModeCounter        = 0;
+  56          uint8_t  winterModeStage      = 0;
+  57          
+  58          uint8_t  breezeModeStepFlag       = 0;
+  59          uint16_t breezeModeStepCounter    = 0;
+  60          uint8_t  breezeModeTime       = 0;
+  61          uint8_t  breezeEcoModeSpeed     = 0;
+  62          
+  63          
+  64          // #define FAN_REVERSE_PERCENTAGE             25
+  65          // #define FAN_REVERSE_SPEED                182
+  66          #define ECO_SPEED_PERCENTAGE              90
+  67          
+  68          code uint8_t  pwmSpeedArray[MAX_FAN_SPEED_ARRAY + 1]  = { 0, 23, 35, 43, 55, 73, 80, 95 };
+  69          code uint16_t fanRpm[MAX_FAN_SPEED_ARRAY + 1]       = { 0, 150, 190, 230, 270, 310, 350, 380 };
+  70          code uint8_t  pwmReverseSpeedArray[MAX_FAN_SPEED_ARRAY+1] = { 0, 21, 27, 33, 39, 45, 51, 57 };
+  71          code uint16_t fanReverseRpm[MAX_FAN_SPEED_ARRAY+1]    = { 0, 140, 160, 180, 200, 220, 240, 260 };
+  72          
+  73          #if(ENABLE_TSOP==1)
+  74            void tsopInterruptInit(void) {
+  75   1          P17_INPUT_MODE;           //setting INT0 pin P1.7 as Quasi mode with internal pull high  
+  76   1            P17_PULLUP_ENABLE;
+  77   1            INT1_FALLING_EDGE_TRIG;     //setting trig condition edge
+  78   1            set_IE_EX1;           //INT1_Enable;
+  79   1            ENABLE_GLOBAL_INTERRUPT;    //Global interrupt enable
+  80   1        }
+  81          #endif  
+  82          
+  83          void timer0_Init(void) {
+  84   1        ENABLE_TIMER0_MODE1;
+  85   1        TIMER0_FSYS_DIV12;
+  86   1        TH0 = TH0_INIT;
+  87   1        TL0 = TL0_INIT;   
+  88   1        ENABLE_TIMER0_INTERRUPT;    //enable Timer0 interrupt
+  89   1        ENABLE_GLOBAL_INTERRUPT;  //enable global interrupts
+  90   1        set_IPH_PSH;            // Serial port 0 interrupt level 2
+  91   1        set_IE_ET0;
+  92   1        set_TCON_TR0; 
+  93   1      }
+  94          
+  95          void initConfig(fanConfig *toCfg) {
+  96   1        toCfg->powerState       = 0;
+  97   1        toCfg->fanPowerState    = 0;
+  98   1        toCfg->timer        = 0;
+  99   1        toCfg->timerSec       = 0;
+ 100   1        toCfg->mode         = DEFAULT;
+ 101   1        toCfg->fanSpeed       = 1;
+ 102   1        toCfg->fanRpm         = 0;
+ 103   1        toCfg->light        = 0;
+ 104   1        toCfg->wifiMode         = 0xFF;
+ 105   1        toCfg->reverse        = 0;
+ 106   1      }
+ 107          
+ 108          void clearConfig(fanConfig *toCfg) {
+ 109   1        toCfg->powerState       = 0;
+ 110   1        toCfg->fanPowerState    = 0;
+ 111   1        toCfg->timer        = 0;
+ 112   1        toCfg->timerSec       = 0;
+ 113   1        toCfg->mode         = 0;
+ 114   1        toCfg->fanSpeed       = 0;
+ 115   1        toCfg->fanRpm         = 0;
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 3   
+
+ 116   1        toCfg->light        = 0;
+ 117   1        toCfg->wifiMode         = 0;
+ 118   1        toCfg->reverse        = 0;
+ 119   1      
+ 120   1      }
+ 121          
+ 122          void copyConfig(fanConfig *toCfg, fanConfig *fromCfg) {
+ 123   1        toCfg->powerState       = fromCfg->powerState;
+ 124   1        toCfg->fanPowerState    = fromCfg->fanPowerState;
+ 125   1        toCfg->timer        = fromCfg->timer;
+ 126   1        toCfg->timerSec       = fromCfg->timerSec;
+ 127   1        toCfg->mode         = fromCfg->mode;
+ 128   1        toCfg->fanSpeed       = fromCfg->fanSpeed;
+ 129   1        toCfg->fanRpm         = fromCfg->fanRpm;
+ 130   1        toCfg->light        = fromCfg->light;
+ 131   1        toCfg->wifiMode         = fromCfg->wifiMode;
+ 132   1        toCfg->reverse        = fromCfg->reverse;
+ 133   1      }
+ 134          
+ 135          //need to refactor TSOP Handler
+ 136          #if(ENABLE_TSOP==1)
+ 137            void tsopHandler(void) {
+ 138   1          uint8_t stateUpdate = 0;
+ 139   1      
+ 140   1          if(IRkey == 0) {
+ 141   2            return;
+ 142   2          }
+ 143   1          uartTxChar('a');
+ 144   1          printData(IRkey);
+ 145   1          switch(IRkey) {
+ 146   2            case FAN_POWER_KEY: {
+ 147   3              if(currentConfig.fanPowerState == 1) {
+ 148   4                currentConfig.fanPowerState = 0;
+ 149   4              } else {
+ 150   4                currentConfig.fanPowerState = 1;
+ 151   4                currentConfig.powerState = 1;
+ 152   4              }
+ 153   3              stateUpdate = 1;
+ 154   3            }
+ 155   2            break;
+ 156   2      
+ 157   2            case LIGHT_KEY: {
+ 158   3              if(currentConfig.light == 1) {
+ 159   4                currentConfig.light = 0;
+ 160   4      
+ 161   4              } else {
+ 162   4                currentConfig.light = 1;
+ 163   4                currentConfig.powerState = 1;
+ 164   4              }
+ 165   3              stateUpdate = 1;
+ 166   3            }
+ 167   2            break;
+ 168   2      
+ 169   2              case SPEED_1_KEY: {
+ 170   3              currentConfig.powerState = 1;
+ 171   3              currentConfig.fanPowerState = 1;
+ 172   3              currentConfig.fanSpeed = 1;
+ 173   3              currentConfig.mode = DEFAULT;
+ 174   3              stateUpdate = 1;
+ 175   3              }
+ 176   2              break;
+ 177   2      
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 4   
+
+ 178   2              case SPEED_2_KEY: {
+ 179   3                currentConfig.powerState = 1;
+ 180   3                currentConfig.fanPowerState = 1;
+ 181   3              currentConfig.fanSpeed = 2;
+ 182   3              currentConfig.mode = DEFAULT;
+ 183   3              stateUpdate = 1;
+ 184   3              }
+ 185   2              break;
+ 186   2      
+ 187   2              case SPEED_3_KEY: {
+ 188   3                currentConfig.powerState = 1;
+ 189   3                currentConfig.fanPowerState = 1;
+ 190   3              currentConfig.fanSpeed = 3;
+ 191   3              currentConfig.mode = DEFAULT;
+ 192   3              stateUpdate = 1;
+ 193   3              }
+ 194   2              break;
+ 195   2      
+ 196   2              case SPEED_4_KEY: {
+ 197   3                currentConfig.powerState = 1;
+ 198   3                currentConfig.fanPowerState = 1;
+ 199   3              currentConfig.fanSpeed = 4;
+ 200   3              currentConfig.mode = DEFAULT;
+ 201   3              stateUpdate = 1;
+ 202   3              }
+ 203   2              break;
+ 204   2      
+ 205   2              case SPEED_5_KEY: {
+ 206   3                currentConfig.powerState = 1;
+ 207   3                currentConfig.fanPowerState = 1;
+ 208   3              currentConfig.fanSpeed = 5;
+ 209   3              currentConfig.mode = DEFAULT;
+ 210   3              stateUpdate = 1;
+ 211   3              }
+ 212   2              break;
+ 213   2            
+ 214   2            case SPEED_6_KEY: {
+ 215   3                currentConfig.powerState = 1;
+ 216   3                currentConfig.fanPowerState = 1;
+ 217   3              currentConfig.fanSpeed = 6;
+ 218   3              currentConfig.mode = DEFAULT;
+ 219   3              stateUpdate = 1;
+ 220   3              }
+ 221   2              break;
+ 222   2      
+ 223   2              case BOOST_KEY: {
+ 224   3                currentConfig.powerState = 1;
+ 225   3              currentConfig.fanPowerState = 1;
+ 226   3              currentConfig.mode = TURBO;
+ 227   3              stateUpdate = 1;
+ 228   3            }
+ 229   2            break;
+ 230   2            
+ 231   2              case NATURE_KEY: {
+ 232   3                if(isOnboaringTimerReset()!= 0) {
+ 233   4                #if (ENABLE_IOT == 1)
+ 234   4                  dvcOnboarding_t tempMode = getOnboardingMode();
+ 235   4                  if(tempMode == SMART_CONFIG_ONBORDING) {
+ 236   5                    tempMode = WIFI_MODE_ONBOARDING;
+ 237   5                  } else {
+ 238   5                    tempMode = SMART_CONFIG_ONBORDING;
+ 239   5                  }
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 5   
+
+ 240   4                  setDeviceIntoOnboardingMode(tempMode);
+ 241   4                  resetOnboardingTimer();
+ 242   4                  break;
+ 243   4                #endif
+ 244   4              }
+ 245   3                if(currentConfig.fanPowerState == 1) {
+ 246   4                currentConfig.mode = BREEZE;
+ 247   4                stateUpdate = 1;
+ 248   4                }
+ 249   3            }
+ 250   2            break;
+ 251   2              
+ 252   2            case SMART_KEY: {
+ 253   3              if(currentConfig.fanPowerState == 1) {
+ 254   4                currentConfig.mode = ECO;
+ 255   4                stateUpdate = 1;
+ 256   4                } 
+ 257   3            } 
+ 258   2            break;
+ 259   2      
+ 260   2            case REVERSE_KEY: {
+ 261   3              currentConfig.powerState = 1;
+ 262   3              currentConfig.fanPowerState = 1;
+ 263   3              if(currentConfig.reverse){
+ 264   4                currentConfig.reverse = 0;
+ 265   4              }else{
+ 266   4                currentConfig.reverse = 1;
+ 267   4              }
+ 268   3              stateUpdate = 1;
+ 269   3            }
+ 270   2            break;
+ 271   2      
+ 272   2            case TIMER_ON_OFF_KEY: {
+ 273   3              currentConfig.timer = 0;
+ 274   3              currentConfig.timerSec = 0;
+ 275   3              setBuzzerVariables(BUZZER_TIMER_OFF);
+ 276   3              stateUpdate = 1;
+ 277   3            }
+ 278   2            break;
+ 279   2            
+ 280   2          
+ 281   2            case TIMER_2HR_KEY: {
+ 282   3              if(currentConfig.fanPowerState == 1 ) {
+ 283   4                currentConfig.timer = 2* TIMER_SEC_VALUE;
+ 284   4                currentConfig.timerSec = currentConfig.timer;
+ 285   4                stateUpdate = 1;
+ 286   4              }
+ 287   3            
+ 288   3            }
+ 289   2            break;
+ 290   2            
+ 291   2            case TIMER_4HR_KEY: {
+ 292   3              if(currentConfig.fanPowerState == 1) {
+ 293   4                currentConfig.timer = 4* TIMER_SEC_VALUE;
+ 294   4                currentConfig.timerSec = currentConfig.timer;
+ 295   4                stateUpdate = 1;
+ 296   4              }
+ 297   3            }
+ 298   2            break;
+ 299   2            
+ 300   2            case TIMER_8HR_KEY: {
+ 301   3              startOnboardingTimer(); 
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 6   
+
+ 302   3              if(currentConfig.fanPowerState == 1) {
+ 303   4                currentConfig.timer = 8* TIMER_SEC_VALUE;
+ 304   4                currentConfig.timerSec = currentConfig.timer ;
+ 305   4                stateUpdate = 1;
+ 306   4              }
+ 307   3            }
+ 308   2            break;
+ 309   2      
+ 310   2            default: {      
+ 311   3              stateUpdate = 0 ; 
+ 312   3            }
+ 313   2            break;
+ 314   2          }
+ 315   1          // printData(IRkey);
+ 316   1          IRkey = 0;
+ 317   1      
+ 318   1          if(stateUpdate == 1) {
+ 319   2            setHardwareState();
+ 320   2            stateUpdate = 0;
+ 321   2          }
+ 322   1        }
+ 323          #endif
+ 324          
+ 325          void defaultModeHandler(void) {
+ 326   1        if ((previousConfig.mode != currentConfig.mode) || ((currentConfig.fanPowerState!= previousConfig.fanPowe
+             -rState)) || (previousConfig.fanSpeed != currentConfig.fanSpeed)||(previousConfig.reverse != currentConfig.reverse)) {
+ 327   2            if(currentConfig.fanPowerState == 1) {
+ 328   3              if(currentConfig.reverse){
+ 329   4                fanPWM = pwmReverseSpeedArray[currentConfig.fanSpeed];
+ 330   4                targetFanRPM = fanReverseRpm[currentConfig.fanSpeed]; 
+ 331   4                fanDirection = CLOCKWISE_FAN_DIRECTION;
+ 332   4              }else{
+ 333   4                fanPWM = pwmSpeedArray[currentConfig.fanSpeed];
+ 334   4                targetFanRPM = fanRpm[currentConfig.fanSpeed]; 
+ 335   4                fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 336   4              }
+ 337   3              setFanSpeed(targetFanRPM, fanPWM, fanDirection);
+ 338   3            }
+ 339   2        }
+ 340   1      }
+ 341          
+ 342          void turboModeHandler(void) {
+ 343   1        if((previousConfig.mode != currentConfig.mode)||(previousConfig.reverse != currentConfig.reverse) || (cur
+             -rentConfig.fanPowerState!=previousConfig.fanPowerState)) {
+ 344   2          if(currentConfig.fanPowerState) {
+ 345   3            if(currentConfig.reverse){
+ 346   4              fanPWM = pwmReverseSpeedArray[MAX_FAN_SPEED_ARRAY];
+ 347   4                targetFanRPM = fanReverseRpm[MAX_FAN_SPEED_ARRAY]; 
+ 348   4                fanDirection = CLOCKWISE_FAN_DIRECTION;
+ 349   4            }else{
+ 350   4              fanPWM = pwmSpeedArray[MAX_FAN_SPEED_ARRAY];
+ 351   4                targetFanRPM = fanRpm[MAX_FAN_SPEED_ARRAY]; 
+ 352   4                fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 353   4            }
+ 354   3              setFanSpeed(targetFanRPM, fanPWM, fanDirection);
+ 355   3          }
+ 356   2        }
+ 357   1      }
+ 358          
+ 359          void ecoModeHandler(void) {
+ 360   1        if ((previousConfig.mode != currentConfig.mode)|| (currentConfig.fanPowerState!=previousConfig.fanPowerSt
+             -ate)||(previousConfig.reverse != currentConfig.reverse) || (previousConfig.fanSpeed!=currentConfig.fanSpeed)) {
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 7   
+
+ 361   2            if(currentConfig.fanPowerState == 1) {
+ 362   3              if(currentConfig.reverse){
+ 363   4                fanPWM = (pwmReverseSpeedArray[currentConfig.fanSpeed]*90)/100;
+ 364   4                targetFanRPM = (fanReverseRpm[currentConfig.fanSpeed]*90)/100; 
+ 365   4                fanDirection = CLOCKWISE_FAN_DIRECTION;
+ 366   4                breezeEcoModeSpeed = currentConfig.fanSpeed;
+ 367   4              }else{
+ 368   4                fanPWM = (pwmSpeedArray[currentConfig.fanSpeed]*90)/100;
+ 369   4                targetFanRPM = (fanRpm[currentConfig.fanSpeed]*90)/100; 
+ 370   4                fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 371   4                breezeEcoModeSpeed = currentConfig.fanSpeed;
+ 372   4              }
+ 373   3              setFanSpeed(targetFanRPM, fanPWM, fanDirection);
+ 374   3            }   
+ 375   2        }
+ 376   1      }
+ 377          
+ 378          void breezeModeHandler(void) {
+ 379   1        if(previousConfig.mode!= currentConfig.mode||(previousConfig.reverse != currentConfig.reverse)|| (current
+             -Config.fanPowerState!=previousConfig.fanPowerState)) {
+ 380   2          breezeModeStepCounter = 1;
+ 381   2          breezeModeStepFlag    = 1;
+ 382   2          breezeEcoModeSpeed    = currentConfig.fanSpeed;
+ 383   2        }
+ 384   1      
+ 385   1        if(currentConfig.powerState == 1) {
+ 386   2          breezeModeStepCounter--;
+ 387   2        
+ 388   2          if(breezeModeStepCounter == 0) {
+ 389   3            if(breezeModeStepFlag == 0) {
+ 390   4              breezeModeStepFlag = 1;
+ 391   4              if(currentConfig.reverse){
+ 392   5                fanPWM = (pwmReverseSpeedArray[currentConfig.fanSpeed]*BREEZE_MODE_MINUMUM_SPEED_PERCENT)/100;
+ 393   5                  targetFanRPM = (fanReverseRpm[currentConfig.fanSpeed]*BREEZE_MODE_MINUMUM_SPEED_PERCENT)/100; 
+ 394   5                  fanDirection = CLOCKWISE_FAN_DIRECTION;
+ 395   5              }else{
+ 396   5                fanPWM = (pwmSpeedArray[currentConfig.fanSpeed]*BREEZE_MODE_MINUMUM_SPEED_PERCENT)/100;
+ 397   5                  targetFanRPM = (fanRpm[currentConfig.fanSpeed]*BREEZE_MODE_MINUMUM_SPEED_PERCENT)/100; 
+ 398   5                  fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 399   5              }
+ 400   4              
+ 401   4                setFanSpeed(targetFanRPM, fanPWM, fanDirection);\
+ 402   4                breezeModeStepCounter = BREEZE_MODE_RAMPUP_TIME;
+ 403   4            } else {
+ 404   4              breezeModeStepFlag = 0;
+ 405   4              if(currentConfig.reverse){
+ 406   5                fanPWM = (pwmReverseSpeedArray[currentConfig.fanSpeed]*BREEZE_MODE_MAXIMUM_SPEED_PERCENT)/100;
+ 407   5                  targetFanRPM = (fanReverseRpm[currentConfig.fanSpeed]*BREEZE_MODE_MAXIMUM_SPEED_PERCENT)/100; 
+ 408   5                  fanDirection = CLOCKWISE_FAN_DIRECTION;
+ 409   5              }else{
+ 410   5                fanPWM = (pwmSpeedArray[currentConfig.fanSpeed]*BREEZE_MODE_MAXIMUM_SPEED_PERCENT)/100;
+ 411   5                  targetFanRPM = (fanRpm[currentConfig.fanSpeed]*BREEZE_MODE_MAXIMUM_SPEED_PERCENT)/100; 
+ 412   5                  fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 413   5              }
+ 414   4                setFanSpeed(targetFanRPM, fanPWM, fanDirection);
+ 415   4                breezeModeStepCounter = BREEZE_MODE_RAMPDOWN_TIME;
+ 416   4            } 
+ 417   3          }
+ 418   2        }
+ 419   1      }
+ 420          
+ 421          void timerHandler(void) {
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 8   
+
+ 422   1        if(currentConfig.fanPowerState == 0) {
+ 423   2          currentConfig.timer = 0;
+ 424   2          currentConfig.timerSec = 0;
+ 425   2          return;
+ 426   2        } 
+ 427   1      
+ 428   1        if(currentConfig.timer!= 0) {
+ 429   2          currentConfig.timerSec--;
+ 430   2          if(currentConfig.timerSec == 0) {
+ 431   3            currentConfig.timer    = 0;
+ 432   3            currentConfig.fanPowerState = 0;
+ 433   3            setHardwareState();
+ 434   3          }
+ 435   2        }
+ 436   1      }
+ 437          
+ 438          void resetTimers() {
+ 439   1        currentConfig.timer = 0;
+ 440   1        currentConfig.timerSec = 0;
+ 441   1        previousConfig.timer = 0;
+ 442   1      }
+ 443          
+ 444          void setHardwareState() {
+ 445   1        if(currentConfig.fanPowerState == 1) {
+ 446   2          modeHandler(currentConfig.mode);
+ 447   2          timerHandler();
+ 448   2          setBuzzerVariables(BUZZER_BEEP);
+ 449   2          #if (ENABLE_LED == 1)
+ 450   2            if(previousConfig.light == currentConfig.light){
+ 451   3              if(currentConfig.mode == TURBO) {
+ 452   4                setLedVariables(LED_PIN_ON, 7, DEFAULT_LED_ON, DEFAULT_LED_OFF);
+ 453   4              }  else {
+ 454   4                setLedVariables(LED_PIN_ON, currentConfig.fanSpeed, DEFAULT_LED_ON, DEFAULT_LED_OFF);
+ 455   4              }
+ 456   3            }
+ 457   2          #endif
+ 458   2          
+ 459   2        } else {
+ 460   2          modeHandler(currentConfig.mode);
+ 461   2          timerHandler();
+ 462   2          setBuzzerVariables(BUZZER_LONG);
+ 463   2      
+ 464   2          #if (ENABLE_LED == 1)
+ 465   2            if(previousConfig.light == currentConfig.light){
+ 466   3              setLedVariables(LED_LONG);
+ 467   3            }
+ 468   2          #endif
+ 469   2          fanPWM = 0;
+ 470   2            targetFanRPM = 0; 
+ 471   2            fanDirection = ANTICLOCKWISE_FAN_DIRECTION;
+ 472   2            setFanSpeed(targetFanRPM, fanPWM, fanDirection);
+ 473   2        }
+ 474   1      
+ 475   1        configChanged = 1;
+ 476   1        #if (ENABLE_IOT == 1) 
+ 477   1          iotfySerialUpdateFlag = 1;
+ 478   1        #endif
+ 479   1      
+ 480   1        copyConfig(&previousConfig, &currentConfig);
+ 481   1      }
+ 482          
+ 483          void modeHandler(unsigned char fan_mode) {
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 9   
+
+ 484   1        switch(fan_mode) {
+ 485   2          case DEFAULT: {
+ 486   3            defaultModeHandler();
+ 487   3          }
+ 488   2          break;
+ 489   2          
+ 490   2          case BREEZE: {
+ 491   3            breezeModeHandler();
+ 492   3          }
+ 493   2          break;
+ 494   2          
+ 495   2          case ECO: {
+ 496   3            ecoModeHandler();
+ 497   3          }
+ 498   2          break;
+ 499   2          
+ 500   2          case TURBO: {
+ 501   3            turboModeHandler();
+ 502   3          }
+ 503   2          break;
+ 504   2          
+ 505   2          default:
+ 506   2          break;
+ 507   2        }
+ 508   1      }
+ 509          
+ 510          /*********************EEPROM RELATED FUCNIONS********************************/
+ 511          
+ 512          void configSaveInFlash(void) {
+ 513   1        write_EE(POWER_ADDR,    currentConfig.powerState);
+ 514   1        write_EE(FAN_POWER_ADDR,    currentConfig.fanPowerState);
+ 515   1        write_EE(LIGHT_POWER_ADDR,  currentConfig.light);
+ 516   1        write_EE(SPEED_ADDR,    currentConfig.fanSpeed);
+ 517   1        write_EE(MODE_ADDR,     currentConfig.mode);
+ 518   1        //write_EE(REVERSE_ADDR,    currentConfig.reverse);
+ 519   1      }
+ 520          
+ 521          void flashInitSet(void) {
+ 522   1        initConfig(&currentConfig);
+ 523   1        configSaveInFlash();
+ 524   1        write_EE(INIT_MEM, 0);
+ 525   1      }
+ 526          
+ 527          void loadSystemConfigFromEEPROM(void) {
+ 528   1        uint8_t i = 0;
+ 529   1      
+ 530   1        if(read_EE(INIT_MEM) == 0) {
+ 531   2          currentConfig.powerState  = read_EE(POWER_ADDR);
+ 532   2          currentConfig.fanPowerState = read_EE(FAN_POWER_ADDR);
+ 533   2          currentConfig.light       = read_EE(LIGHT_POWER_ADDR);
+ 534   2          currentConfig.mode      = read_EE(MODE_ADDR);
+ 535   2          currentConfig.fanSpeed    = read_EE(SPEED_ADDR);
+ 536   2          //currentConfig.reverse     = read_EE(REVERSE_ADDR);
+ 537   2          currentConfig.reverse = 0;
+ 538   2          currentConfig.fanRpm = 0;
+ 539   2      
+ 540   2        } else {
+ 541   2          flashInitSet(); //Set Memory To default
+ 542   2        }
+ 543   1      }
+ 544          
+ 545          uint16_t updateCurrentFanRPM(void) {
+C51 COMPILER V9.60.7.0   FUNCTION                                                          09/12/2024 17:56:52 PAGE 10  
+
+ 546   1        return getCurrentFanRpm();
+ 547   1      }
+ 548          
+ 549          /********************************* ONBOARIDNG ***********************************/
+ 550          void startOnboardingTimer(void) {
+ 551   1        if(onboardingStartFlag == 1) {
+ 552   2          return;
+ 553   2        }
+ 554   1        onboaringCounter = ONBOARDING_COUNTER;
+ 555   1        onboardingStartFlag = 1;
+ 556   1      }
+ 557          
+ 558          void onboardingTimer(void) {
+ 559   1        if(onboaringCounter == 0) {
+ 560   2          return;
+ 561   2        }
+ 562   1      
+ 563   1        onboaringCounter--;
+ 564   1        if(onboaringCounter == 0) {
+ 565   2          onboardingStartFlag = 0;
+ 566   2        }
+ 567   1      }
+ 568          
+ 569          uint16_t isOnboaringTimerReset(void) {
+ 570   1        return onboaringCounter;
+ 571   1      }
+ 572          
+ 573          void resetOnboardingTimer(void) {
+ 574   1        onboaringCounter = 0;
+ 575   1        onboardingStartFlag = 0;
+ 576   1      }
+ 577          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2958    ----
+   CONSTANT SIZE    =     48    ----
+   XDATA SIZE       =     11       9
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

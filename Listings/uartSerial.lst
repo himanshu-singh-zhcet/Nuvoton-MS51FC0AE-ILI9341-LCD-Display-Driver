@@ -1,0 +1,240 @@
+C51 COMPILER V9.60.7.0   UARTSERIAL                                                        09/12/2024 17:56:55 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UARTSERIAL
+OBJECT MODULE PLACED IN .\Objects\uartSerial.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\uartSerial.c LARGE OPTIMIZE(8,SPEED) BROWS
+                    -E INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\uartSerial.lst) TABS(2) OBJECT(.\Objec
+                    -ts\uartSerial.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "uart.h"
+   4          #include "device.h"
+   5          #include "function.h"
+   6          #include "wdtConfig.h"
+   7          #include "uartSerial.h"
+   8          
+   9          #include "fanMasterControl.h"
+  10          
+  11          extern volatile uint32_t fanPWM;
+  12          extern volatile uint32_t targetFanRPM;
+  13          extern volatile uint8_t fanDirection;
+  14          
+  15          extern volatile uint16_t mcfSpeedArray[MCF_SPEED_CONTROL_ARRAY];
+  16          extern volatile uint32_t fanRPMPWMValue;
+  17          extern volatile uint32_t mcfSpeedReadValue;
+  18          
+  19          extern data volatile unsigned int instantMsCountforFG;
+  20          extern data volatile unsigned int instantRPMValue;
+  21          
+  22          extern volatile fanConfig currentConfig, previousConfig;
+  23          extern data volatile t_fanControlConfig   fanControlConfig;   //For The Fan Motor Driver Wattage Control Ch
+             -eck....
+  24          
+  25          void uartInit(void) {
+  26   1        P06_QUASI_MODE;
+  27   1        P07_INPUT_MODE;
+  28   1        SCON = 0x50;    
+  29   1        
+  30   1        set_PCON_SMOD;      //UART0 Double Rate Enable
+  31   1        T3CON &= 0xF8;    //T3PS2 = 0,T3PS1 = 0,T3PS0 = 0(Prescale = 1)
+  32   1          set_T3CON_BRCK;     //UART0 baud rate clock source = Timer3
+  33   1        
+  34   1        RH3    = HIBYTE(65536 - (24000000/16/115200));  
+  35   1        RL3    = LOBYTE(65536 - (24000000/16/115200));     
+  36   1        
+  37   1        set_T3CON_TR3;
+  38   1        ENABLE_UART0_INTERRUPT;
+  39   1        ENABLE_GLOBAL_INTERRUPT;
+  40   1      }
+  41          
+  42          void uartTxChar(unsigned char a) {
+  43   1        TI = 0;  
+  44   1        SBUF = a;
+  45   1        while(TI == 0);
+  46   1      }
+  47          
+  48          void uartTxString(unsigned char *a) {
+  49   1        unsigned int i= 0;
+  50   1        while(a[i]!= '\0') {
+  51   2          uartTxChar(a[i]);
+  52   2            i++;
+C51 COMPILER V9.60.7.0   UARTSERIAL                                                        09/12/2024 17:56:55 PAGE 2   
+
+  53   2        }
+  54   1      }
+  55          
+  56          void uartTxStringLength(unsigned char *a , int l) {
+  57   1        unsigned int i = 0;
+  58   1        while(i<l) {
+  59   2          uartTxChar(a[i]);
+  60   2          i++;
+  61   2        }
+  62   1      }
+  63          
+  64          void printData(uint32_t prtData) {
+  65   1        uint32_t temp1, temp2, temp3, temp4;
+  66   1        
+  67   1        DISABLE_UART0_INTERRUPT;
+  68   1        temp1 = (prtData &0x000000FF);
+  69   1        temp2 = (prtData &0x0000FF00)>>8;
+  70   1        temp3 = (prtData &0x00FF0000)>>16;
+  71   1        temp4 = (prtData &0xFF000000)>>24;
+  72   1      
+  73   1        temp1 = (unsigned char) temp1;
+  74   1        temp2 = (unsigned char) temp2;
+  75   1        temp3 = (unsigned char) temp3;
+  76   1        temp4 = (unsigned char) temp4;
+  77   1      
+  78   1        uartTxChar((unsigned char)temp4);
+  79   1        uartTxChar((unsigned char)temp3);
+  80   1        uartTxChar((unsigned char)temp2);
+  81   1        uartTxChar((unsigned char)temp1);
+  82   1        ENABLE_UART0_INTERRUPT;
+  83   1      }
+  84          
+  85          void convertNumToCharTemp(uint32_t num, char *value, int len) {
+  86   1        int count = 0, i = 0;
+  87   1        unsigned char tempBuf[13];
+  88   1        int isUpdate = 1;
+  89   1      
+  90   1        memset(tempBuf, '\0', 13);
+  91   1        memset(value,   '\0', len);
+  92   1      
+  93   1        while(num!= 0) {
+  94   2          tempBuf[count] = num%10 + 0x30;
+  95   2          num = num /10;
+  96   2          count++;
+  97   2          isUpdate = 0;
+  98   2        }
+  99   1      
+ 100   1        if(isUpdate) {
+ 101   2          value[0] = '0';
+ 102   2          value[1] = '\0';
+ 103   2        } else {
+ 104   2          for(i = 0; i<13; i++) {
+ 105   3          value[i] = tempBuf[count - i -1];
+ 106   3            if(i == count -1) {
+ 107   4              break;
+ 108   4            }
+ 109   3          }
+ 110   2        }
+ 111   1      }
+ 112          
+ 113          void sendCommaData(void) {
+ 114   1        unsigned char tempBuf[13];
+C51 COMPILER V9.60.7.0   UARTSERIAL                                                        09/12/2024 17:56:55 PAGE 3   
+
+ 115   1        memset(tempBuf, '\0', sizeof(tempBuf));
+ 116   1      
+ 117   1        DISABLE_UART0_INTERRUPT;
+ 118   1        convertNumToCharTemp(currentConfig.powerState, tempBuf, 13);
+ 119   1        uartTxString(tempBuf);
+ 120   1        uartTxChar(',');
+ 121   1      
+ 122   1        convertNumToCharTemp(currentConfig.mode, tempBuf, 13);
+ 123   1        uartTxString(tempBuf);
+ 124   1        uartTxChar(',');
+ 125   1      
+ 126   1        convertNumToCharTemp(currentConfig.fanSpeed, tempBuf, 13);
+ 127   1        uartTxString(tempBuf);
+ 128   1        uartTxChar(',');
+ 129   1      
+ 130   1        convertNumToCharTemp(fanPWM, tempBuf, 13);
+ 131   1        uartTxString(tempBuf);
+ 132   1        uartTxChar(',');
+ 133   1      
+ 134   1        convertNumToCharTemp(targetFanRPM, tempBuf, 13);
+ 135   1        uartTxString(tempBuf);
+ 136   1        uartTxChar(',');
+ 137   1      
+ 138   1        convertNumToCharTemp(currentConfig.timerSec, tempBuf, 13);
+ 139   1        uartTxString(tempBuf);
+ 140   1        uartTxChar(',');
+ 141   1      
+ 142   1        convertNumToCharTemp(fanDirection, tempBuf, 13);
+ 143   1        uartTxString(tempBuf);
+ 144   1        uartTxChar(',');
+ 145   1      
+ 146   1        convertNumToCharTemp(instantMsCountforFG, tempBuf, 13);
+ 147   1        uartTxString(tempBuf);
+ 148   1        uartTxChar(',');
+ 149   1      
+ 150   1        convertNumToCharTemp(instantRPMValue, tempBuf, 13);
+ 151   1        uartTxString(tempBuf);
+ 152   1        uartTxChar(',');
+ 153   1      
+ 154   1        convertNumToCharTemp(mcfSpeedReadValue, tempBuf, 13);
+ 155   1        uartTxString(tempBuf);
+ 156   1        uartTxChar(',');
+ 157   1      
+ 158   1        convertNumToCharTemp(updateCurrentFanRPM(), tempBuf, 13);
+ 159   1        uartTxString(tempBuf);
+ 160   1        uartTxChar(',');
+ 161   1      
+ 162   1        convertNumToCharTemp(PIN_FANBRAKE, tempBuf, 13);
+ 163   1        uartTxString(tempBuf);
+ 164   1        uartTxChar(',');
+ 165   1      
+ 166   1        convertNumToCharTemp(PIN_FANDIRECTION, tempBuf, 13);
+ 167   1        uartTxString(tempBuf);
+ 168   1        uartTxChar(',');
+ 169   1      
+ 170   1        convertNumToCharTemp(fanControlConfig.isSpeedControlNeedTobeChecked, tempBuf, 13);
+ 171   1        uartTxString(tempBuf);
+ 172   1        uartTxChar(',');
+ 173   1      
+ 174   1        convertNumToCharTemp(fanControlConfig.isFanRpmAverageCheckStarted, tempBuf, 13);
+ 175   1        uartTxString(tempBuf);
+ 176   1        uartTxChar(',');
+C51 COMPILER V9.60.7.0   UARTSERIAL                                                        09/12/2024 17:56:55 PAGE 4   
+
+ 177   1      
+ 178   1        convertNumToCharTemp(fanControlConfig.currentSetPwm, tempBuf, 13);
+ 179   1        uartTxString(tempBuf);
+ 180   1        uartTxChar(',');
+ 181   1      
+ 182   1        convertNumToCharTemp(fanRPMPWMValue, tempBuf, 13);
+ 183   1        uartTxString(tempBuf);
+ 184   1        uartTxChar('\n');
+ 185   1        
+ 186   1        ENABLE_UART0_INTERRUPT;
+ 187   1      
+ 188   1        resetWatchDog();
+ 189   1        sendSpeedRPMArray();
+ 190   1      }
+ 191          
+ 192          void sendSpeedRPMArray(void) {
+ 193   1        unsigned char tempBuf[13];
+ 194   1        uint8_t i = 0;
+ 195   1        memset(tempBuf, '\0', sizeof(tempBuf));
+ 196   1      
+ 197   1        DISABLE_UART0_INTERRUPT;
+ 198   1        for(i=0;i<MCF_SPEED_CONTROL_ARRAY;i++) {
+ 199   2          convertNumToCharTemp(mcfSpeedArray[i], tempBuf, 13);
+ 200   2          uartTxString(tempBuf);
+ 201   2          uartTxChar(',');
+ 202   2        }
+ 203   1      
+ 204   1        convertNumToCharTemp(updateCurrentFanRPM(), tempBuf, 13);
+ 205   1        uartTxString(tempBuf);
+ 206   1        uartTxChar('\n');
+ 207   1        ENABLE_UART0_INTERRUPT;
+ 208   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1406    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      83
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

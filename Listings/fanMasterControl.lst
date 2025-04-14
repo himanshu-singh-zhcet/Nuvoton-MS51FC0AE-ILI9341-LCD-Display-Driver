@@ -1,0 +1,1308 @@
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE FANMASTERCONTROL
+OBJECT MODULE PLACED IN .\Objects\fanMasterControl.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\fanMasterControl.c LARGE OPTIMIZE(8,SPEED)
+                    - BROWSE INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\fanMasterControl.lst) TABS(2) OB
+                    -JECT(.\Objects\fanMasterControl.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "wdtConfig.h"
+   4          #include "iotfyI2c.h"
+   5          #include "mcfMotorDriver.h"
+   6          #include "fanMasterControl.h"
+   7          #include "digismartFanConfig.h"
+   8          #include "buzzer.h"
+   9          
+  10          #include "uartSerial.h"
+  11          
+  12          volatile reportFault = 0;
+  13          
+  14          data volatile tMotorConfig       motorConfig;     //For The Fan Motor Driver Config......
+  15          data volatile t_faultConfig      faultConfig;     //For The Fan Motor Driver Fault........
+  16          data volatile t_fanControlConfig   fanControlConfig;    //For The Fan Motor Driver Wattage Control Check....
+  17          data volatile t_fanMasterControl   fanMasterControlConfig; //For The Fan Motor Driver Start Check.........
+  18          
+  19          volatile uint16_t mcfSpeedArray[MCF_SPEED_CONTROL_ARRAY];
+  20          static uint16_t mcfVoltageArray[MCF_WATTAGE_CONTROL_ARRAY];
+  21          static uint32_t mcfWattageArray[MCF_WATTAGE_CONTROL_ARRAY];
+  22          
+  23          //Only for debug
+  24          volatile uint32_t fanRPMPWMValue = 0;
+  25          volatile uint32_t mcfSpeedReadValue = 0;
+  26          
+  27          data volatile unsigned int instantMsCountforFG   = 0;
+  28          data volatile unsigned int instantFGMsCount   = 0;
+  29          data volatile unsigned int instantRPMValue   = 0;
+  30          
+  31          
+  32          /************************Extern Variables*************************/
+  33          
+  34          /*********************** coasting related *************************/
+  35          
+  36          uint8_t isMotorCoasting(void) {
+  37   1        if(instantRPMValue >= MINIMUM_RPM_TO_CONSIDER_MOTOR_IS_COASTING) {
+  38   2          return 0;
+  39   2        }
+  40   1      
+  41   1        return 1;
+  42   1      }
+  43          
+  44          /*********************** MASTER CONTORL RELATED ************************/
+  45          void initFanMasterControl(void) {
+  46   1        P00_PUSHPULL_MODE;
+  47   1        P10_PUSHPULL_MODE;
+  48   1        P12_PUSHPULL_MODE;
+  49   1      
+  50   1        PIN_DRVOFF      = 0;
+  51   1        PIN_FANBRAKE    = 0;
+  52   1        PIN_FANDIRECTION  = 0;
+  53   1        
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 2   
+
+  54   1        P11_INPUT_MODE;
+  55   1      
+  56   1        fanMasterControlConfig.isMasterControlInitiated = 0;
+  57   1        fanMasterControlConfig.masterControlStage     = FAN_RESET_INIT_STAGE;
+  58   1        fanMasterControlConfig.isFanCoastingCheckNeeded = true;
+  59   1      }
+  60          
+  61          void fanMasterControlTimeHandler(void) { //Call in 1 Ms Timer 
+  62   1        if(fanMasterControlConfig.isMasterControlInitiated == 0) {
+  63   2          return;
+  64   2        }
+  65   1      
+  66   1        fanMasterControlConfig.masterControlTimeoutCounter--;
+  67   1        if(fanMasterControlConfig.masterControlTimeoutCounter == 0) {
+  68   2          switch(fanMasterControlConfig.masterControlStage) {
+  69   3            case FAN_RESET_INIT_STAGE: {
+  70   4              fanMasterControlConfig.masterControlStage = FAN_RESET_STAGE;
+  71   4            }
+  72   3            break;
+  73   3      
+  74   3            case FAN_REVERSE_RAMP_DOWN_WAIT: {
+  75   4              fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_2;
+  76   4            }
+  77   3            break;
+  78   3      
+  79   3            case FAN_STATE_AFTER_BREAK_RELEASE_WAIT: {
+  80   4              fanMasterControlConfig.masterControlStage = SET_FAN_DIRECTION;
+  81   4            }
+  82   3            break;
+  83   3      
+  84   3            case SET_FAN_DIRECTION_WAIT: {
+  85   4              fanMasterControlConfig.masterControlStage = FAN_SPEED_RELEASE_STAGE;
+  86   4            }
+  87   3            break;
+  88   3      
+  89   3            default :{
+  90   4      
+  91   4            }
+  92   3            break;
+  93   3          }
+  94   2        }
+  95   1      }
+  96          
+  97          void fanMasterControlHandler(void) {
+  98   1        uint8_t isSpeedUpdateNeeded = 0;
+  99   1        uint32_t speedPwm  = 0;
+ 100   1        uint32_t tempSpeed = 0x00000000;
+ 101   1      
+ 102   1        if(fanMasterControlConfig.isMasterControlInitiated == 0) {
+ 103   2          return;
+ 104   2        }
+ 105   1      
+ 106   1        switch(fanMasterControlConfig.masterControlStage) {
+ 107   2          case FAN_RESET_INIT_STAGE: {
+ 108   3            
+ 109   3          }
+ 110   2          break;
+ 111   2      
+ 112   2          case FAN_RESET_STAGE: {
+ 113   3            if (fanMasterControlConfig.isFanCoastingCheckNeeded == true) {
+ 114   4              fanMasterControlConfig.masterControlStage = COASTING_CHECK_STAGE;
+ 115   4              break;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 3   
+
+ 116   4            }
+ 117   3            fanMasterControlConfig.masterControlStage = DECISION_STAGE;
+ 118   3          }
+ 119   2          break;
+ 120   2      
+ 121   2          case COASTING_CHECK_STAGE: {
+ 122   3            if(isMotorCoasting()) {
+ 123   4              fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_2;  
+ 124   4            } else {
+ 125   4              fanMasterControlConfig.masterControlStage = DECISION_STAGE;
+ 126   4            }
+ 127   3          }
+ 128   2          break;
+ 129   2      
+ 130   2          case DECISION_STAGE: { //Move The Fan from Here
+ 131   3            PIN_FANBRAKE = 0;
+ 132   3      
+ 133   3            // If The Speed Is Set To 0
+ 134   3            if(fanMasterControlConfig.designatedSpeed == 0 || fanMasterControlConfig.initPwmDuty == 0) {
+ 135   4              fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_1;
+ 136   4              break;
+ 137   4            }
+ 138   3      
+ 139   3            if(PIN_FANDIRECTION!= fanMasterControlConfig.fanDirection) {
+ 140   4              fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_1;
+ 141   4              break;
+ 142   4            }
+ 143   3      
+ 144   3            fanMasterControlConfig.masterControlStage = SET_FAN_DIRECTION;
+ 145   3          }
+ 146   2          break;
+ 147   2          
+ 148   2          case FAN_REVERSE_RAMP_DOWN_1: {
+ 149   3            if(instantRPMValue <= FAN_RAMP_DOWN_SPEED) {
+ 150   4              fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_2;
+ 151   4              break;
+ 152   4            }
+ 153   3      
+ 154   3            speedPwm = FAN_RAMP_DOWN_SPEED_PER;
+ 155   3            isSpeedUpdateNeeded             = 1;
+ 156   3            fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_WAIT;
+ 157   3            fanMasterControlConfig.masterControlTimeoutCounter = RAMP_DOWN_TO_ZERO_WAIT_TIME;
+ 158   3          }
+ 159   2          break;
+ 160   2      
+ 161   2          case FAN_REVERSE_RAMP_DOWN_WAIT: {
+ 162   3      
+ 163   3          }
+ 164   2          break;
+ 165   2      
+ 166   2          case FAN_REVERSE_RAMP_DOWN_2: {
+ 167   3            speedPwm = 0;
+ 168   3            isSpeedUpdateNeeded = 1;
+ 169   3            fanMasterControlConfig.isFanCoastingCheckNeeded = true;
+ 170   3            fanMasterControlConfig.masterControlStage = FAN_REVERSE_RAMP_DOWN_FG_CHECK;
+ 171   3          }
+ 172   2          break;
+ 173   2      
+ 174   2          case FAN_REVERSE_RAMP_DOWN_FG_CHECK: {
+ 175   3            if((instantRPMValue > 0) && (instantRPMValue < MINIMUM_RPM_TO_CONSIDER_MOTOR_BRAKING)) {
+ 176   4              PIN_FANBRAKE = 1;
+ 177   4              break;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 4   
+
+ 178   4            }
+ 179   3      
+ 180   3            if(instantRPMValue == 0) {
+ 181   4              PIN_FANBRAKE = 0;
+ 182   4              fanMasterControlConfig.masterControlStage        = FAN_STATE_AFTER_BREAK_RELEASE_WAIT;
+ 183   4              fanMasterControlConfig.masterControlTimeoutCounter = TIMEOUT_AFTER_BREAK_RELEASE;
+ 184   4            }
+ 185   3          }
+ 186   2          break;
+ 187   2      
+ 188   2          case FAN_STATE_AFTER_BREAK_RELEASE_WAIT: {
+ 189   3          }
+ 190   2          break;
+ 191   2      
+ 192   2          case SET_FAN_DIRECTION: {
+ 193   3            if(fanMasterControlConfig.fanDirection == 1) {
+ 194   4              PIN_FANDIRECTION = 1;
+ 195   4            } else {
+ 196   4              PIN_FANDIRECTION = 0;
+ 197   4            }
+ 198   3            fanMasterControlConfig.masterControlStage = SET_FAN_DIRECTION_WAIT;
+ 199   3            fanMasterControlConfig.masterControlTimeoutCounter = SET_FAN_DIRECTION_TIMEOUT;
+ 200   3          }
+ 201   2          break;
+ 202   2      
+ 203   2          case SET_FAN_DIRECTION_WAIT: {
+ 204   3            
+ 205   3          }
+ 206   2          break;    
+ 207   2      
+ 208   2          case FAN_SPEED_RELEASE_STAGE: {
+ 209   3            PIN_FANBRAKE = 0;
+ 210   3            fanMasterControlConfig.isFanCoastingCheckNeeded = false;
+ 211   3            speedPwm = fanMasterControlConfig.initPwmDuty;
+ 212   3            isSpeedUpdateNeeded = 1;
+ 213   3            fanMasterControlConfig.masterControlStage = FAN_MASTER_CONTROL_RELEASE_STAGE;
+ 214   3          }
+ 215   2          break;
+ 216   2      
+ 217   2          case FAN_MASTER_CONTROL_RELEASE_STAGE: {
+ 218   3            fanMasterControlConfig.masterControlStage     = FAN_RESET_INIT_STAGE;
+ 219   3            fanMasterControlConfig.isMasterControlInitiated = 0;
+ 220   3      
+ 221   3            if(fanMasterControlConfig.designatedSpeed !=0) {
+ 222   4              initiateOpenLoopFaultCheck(); 
+ 223   4            }
+ 224   3            initiatefanSpeedCurrentCheck(fanMasterControlConfig.designatedSpeed , fanMasterControlConfig.initPwmDut
+             -y);
+ 225   3          }
+ 226   2          break;    
+ 227   2          default: {
+ 228   3      
+ 229   3          }
+ 230   2          break;
+ 231   2        }
+ 232   1      
+ 233   1        if(isSpeedUpdateNeeded == 1) {
+ 234   2          tempSpeed = PWM_FREQ *speedPwm;
+ 235   2          tempSpeed = tempSpeed/100;
+ 236   2          setPWMSpeed(tempSpeed);
+ 237   2        }
+ 238   1      }
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 5   
+
+ 239          
+ 240          void initiateMasterControlCheck(uint16_t speedToBeReached, uint8_t startingPwmDuty, uint8_t direction) {
+ 241   1        fanMasterControlConfig.fanDirection       = direction;
+ 242   1        fanMasterControlConfig.designatedSpeed      = speedToBeReached;
+ 243   1        fanMasterControlConfig.initPwmDuty        = startingPwmDuty;
+ 244   1        fanMasterControlConfig.masterControlStage     = FAN_RESET_INIT_STAGE;
+ 245   1        fanMasterControlConfig.masterControlTimeoutCounter  = DEFAULT_TIMEOUT_MASTER_CONTROL_INIT;
+ 246   1        fanMasterControlConfig.isMasterControlInitiated = 1;
+ 247   1        PIN_FANBRAKE = 0;
+ 248   1      }
+ 249          
+ 250          /*********************** FAN FAULT RELATED ********************************/
+ 251          void initFaultConfig(void) {
+ 252   1        faultConfig.faultStage      = GATE_FAULT_WAIT_STAGE;
+ 253   1        faultConfig.devCtrlData       = 0x00000000;
+ 254   1        faultConfig.gateDriverFault     = 0x00000000;
+ 255   1        faultConfig.controllerFault     = 0x00000000;
+ 256   1        faultConfig.faultClearTimeout   = FAULT_READ_TIMEOUT;
+ 257   1        faultConfig.fanDirection        = 0;
+ 258   1        faultConfig.designatedSpeed     = 0;
+ 259   1        faultConfig.initPwmDuty         = 0;
+ 260   1        faultConfig.openLoopFaultCount  = 0;
+ 261   1      }
+ 262          
+ 263          void faultTimeHandler(void) {
+ 264   1        if((faultConfig.faultStage == OPEN_LOOP_FAULT_CHECK_WAIT_STAGE) || (faultConfig.faultStage == OPEN_LOOP_F
+             -AULT_RESTART_WAIT_STAGE)) {
+ 265   2          
+ 266   2        } else {
+ 267   2          if(PIN_FANFAULT) {
+ 268   3            return;
+ 269   3          }
+ 270   2        }
+ 271   1      
+ 272   1        if(faultConfig.faultClearTimeout!= 0) {
+ 273   2          faultConfig.faultClearTimeout--;
+ 274   2          if(faultConfig.faultClearTimeout == 0) {
+ 275   3            switch (faultConfig.faultStage) {
+ 276   4              case OPEN_LOOP_FAULT_CHECK_WAIT_STAGE: {
+ 277   5                faultConfig.faultStage = OPEN_LOOP_FAULT_CHECK_STAGE;
+ 278   5              }
+ 279   4              break;
+ 280   4      
+ 281   4              case OPEN_LOOP_FAULT_CHECK_STAGE: {
+ 282   5              }
+ 283   4              break;
+ 284   4      
+ 285   4              case OPEN_LOOP_FAULT_RESTART_WAIT_STAGE: {
+ 286   5                faultConfig.faultStage = OPEN_LOOP_FAULT_RESTART_STAGE;
+ 287   5              }
+ 288   4              break;
+ 289   4      
+ 290   4              case GATE_FAULT_WAIT_STAGE: {
+ 291   5                faultConfig.faultStage = GATE_FAULT_CHECK_STAGE;
+ 292   5              }
+ 293   4              break;
+ 294   4      
+ 295   4              case GATE_FAULT_CHECK_STAGE: {
+ 296   5      
+ 297   5              }
+ 298   4              break;
+ 299   4      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 6   
+
+ 300   4              case CONTROLLER_FAULT_WAIT_STAGE: {
+ 301   5                faultConfig.faultStage = CONTROLLER_FAULT_STAGE;
+ 302   5              }
+ 303   4              break;
+ 304   4      
+ 305   4              case CONTROLLER_FAULT_STAGE: {
+ 306   5      
+ 307   5              }
+ 308   4              break;
+ 309   4      
+ 310   4              case FAULT_CLEAR_READ_WAIT_STAGE: {
+ 311   5                faultConfig.faultStage = FAULT_CLEAR_READ_STAGE;
+ 312   5              }
+ 313   4              break;
+ 314   4      
+ 315   4              case FAULT_CLEAR_READ_STAGE: {
+ 316   5      
+ 317   5              }
+ 318   4              break;
+ 319   4      
+ 320   4              case FAULT_CLEAR_WRITE_WAIT_STAGE: {
+ 321   5                faultConfig.faultStage = FAULT_CLEAR_WRITE_STAGE;
+ 322   5              }
+ 323   4              break;
+ 324   4      
+ 325   4              case FAULT_CLEAR_WRITE_STAGE: {
+ 326   5      
+ 327   5              }
+ 328   4              break;
+ 329   4      
+ 330   4              default: {
+ 331   5      
+ 332   5              }
+ 333   4              break;
+ 334   4            }
+ 335   3          }
+ 336   2        }
+ 337   1      }
+ 338          
+ 339          void faultHandler(void) {
+ 340   1        uint32_t tempData = 0x00000000;
+ 341   1        uint8_t  ret  = 0;
+ 342   1      
+ 343   1        if((faultConfig.faultStage == OPEN_LOOP_FAULT_CHECK_STAGE) || (faultConfig.faultStage == OPEN_LOOP_FAULT_
+             -RESTART_STAGE) ||
+ 344   1          (faultConfig.faultStage == OPEN_LOOP_FAULT_CHECK_WAIT_STAGE) || (faultConfig.faultStage == OPEN_LOOP_FAU
+             -LT_RESTART_WAIT_STAGE)) {
+ 345   2          //;
+ 346   2        } else {
+ 347   2          if(PIN_FANFAULT) {
+ 348   3            faultConfig.faultStage = GATE_FAULT_WAIT_STAGE;
+ 349   3            faultConfig.faultClearTimeout = FAULT_READ_TIMEOUT;
+ 350   3            return;
+ 351   3          }
+ 352   2        }
+ 353   1      
+ 354   1        switch (faultConfig.faultStage) {
+ 355   2          case OPEN_LOOP_FAULT_CHECK_WAIT_STAGE: {
+ 356   3            
+ 357   3          }
+ 358   2          break;
+ 359   2      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 7   
+
+ 360   2          case OPEN_LOOP_FAULT_CHECK_STAGE: {
+ 361   3            ret = mcf_read32(motorConfig.mcfAddress, ALGORITHMN_STATE, &tempData);
+ 362   3                  if(ret) {
+ 363   4                    tempData = tempData & (0x0000FFFF);
+ 364   4      
+ 365   4                    if(tempData == 0x0007) {
+ 366   5                      if(faultConfig.openLoopFaultCount == 0) {
+ 367   6                        faultConfig.fanDirection        = fanMasterControlConfig.fanDirection;
+ 368   6                  faultConfig.designatedSpeed     = fanMasterControlConfig.designatedSpeed;
+ 369   6                  faultConfig.initPwmDuty         = fanMasterControlConfig.initPwmDuty;     
+ 370   6                      }
+ 371   5      
+ 372   5                      faultConfig.openLoopFaultCount++;
+ 373   5      
+ 374   5                      if(faultConfig.openLoopFaultCount < TOTAL_OPEN_LOOP_ATTEMPTS) {
+ 375   6                        faultConfig.faultClearTimeout = OPEN_LOOP_FAULT_STOP_WAIT_TIME;
+ 376   6                        faultConfig.faultStage = OPEN_LOOP_FAULT_RESTART_WAIT_STAGE;
+ 377   6                        setFanSpeed(0,0,0);
+ 378   6                      } else {
+ 379   6                        faultConfig.fanDirection        = 0;
+ 380   6                  faultConfig.designatedSpeed     = 0;
+ 381   6                  faultConfig.initPwmDuty         = 0;
+ 382   6                  reportFault = MOTOR_LOCK_FAULT;   
+ 383   6                        setFanSpeed(0,0,0);
+ 384   6                      }
+ 385   5                    } else {
+ 386   5                      initFaultConfig();
+ 387   5                    }
+ 388   4                  } else {
+ 389   4                    if(fanControlConfig.mcfI2CNackControl == NOT_STARTED) {
+ 390   5                    fanControlConfig.mcfI2CNackControl  = IN_COMPLETION;
+ 391   5                  }
+ 392   4                      fanControlConfig.fanControlStage        = MCF_NACK_DEINIT_WAIT_STAGE;
+ 393   4                      fanControlConfig.stageChangeTimeout     = MCF_NACK_RECHECK_TIME;
+ 394   4                  }
+ 395   3          }
+ 396   2          break;
+ 397   2      
+ 398   2          case OPEN_LOOP_FAULT_RESTART_STAGE: {
+ 399   3            faultConfig.faultStage = OPEN_LOOP_FAULT_CHECK_WAIT_STAGE;
+ 400   3            faultConfig.faultClearTimeout = OPEN_LOOP_FAULT_CHECK_WAIT_TIME;
+ 401   3            setFanSpeed(faultConfig.designatedSpeed, faultConfig.initPwmDuty, faultConfig.fanDirection);
+ 402   3          }
+ 403   2          break;
+ 404   2      
+ 405   2          case GATE_FAULT_WAIT_STAGE: {
+ 406   3            
+ 407   3          }
+ 408   2          break;
+ 409   2      
+ 410   2          case GATE_FAULT_CHECK_STAGE: {
+ 411   3            ret = mcf_read32(motorConfig.mcfAddress, GATE_DRIVER_FAULT_STATUS, &tempData); //Read Gate Fault Here
+ 412   3            if(ret == true) {
+ 413   4              faultConfig.gateDriverFault = 0;
+ 414   4              faultConfig.gateDriverFault = tempData;
+ 415   4              faultConfig.faultStage = CONTROLLER_FAULT_WAIT_STAGE;
+ 416   4              faultConfig.faultClearTimeout = FAULT_READ_TIMEOUT;
+ 417   4            } else {
+ 418   4              faultConfig.faultStage = GATE_FAULT_WAIT_STAGE;
+ 419   4              faultConfig.faultClearTimeout = FAULT_CLEAR_WAIT_TIMEOUT;
+ 420   4            }
+ 421   3          }
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 8   
+
+ 422   2          break;
+ 423   2      
+ 424   2          case CONTROLLER_FAULT_WAIT_STAGE: {
+ 425   3            
+ 426   3          }
+ 427   2          break;
+ 428   2      
+ 429   2          case CONTROLLER_FAULT_STAGE: {
+ 430   3            ret = mcf_read32(motorConfig.mcfAddress, CONTROLLER_FAULT_STATUS, &tempData); //Read Gate Fault Here
+ 431   3            if(ret == true) {
+ 432   4              faultConfig.controllerFault = 0;
+ 433   4              faultConfig.controllerFault = tempData;
+ 434   4              faultConfig.faultStage = FAULT_CLEAR_READ_WAIT_STAGE;
+ 435   4              faultConfig.faultClearTimeout = FAULT_READ_TIMEOUT;
+ 436   4            } else {
+ 437   4              faultConfig.faultStage = CONTROLLER_FAULT_WAIT_STAGE;
+ 438   4              faultConfig.faultClearTimeout = FAULT_CLEAR_WAIT_TIMEOUT;
+ 439   4            }
+ 440   3          }
+ 441   2          break;
+ 442   2      
+ 443   2          case FAULT_CLEAR_READ_WAIT_STAGE: {
+ 444   3            
+ 445   3          }
+ 446   2          break;
+ 447   2      
+ 448   2          case FAULT_CLEAR_READ_STAGE: {
+ 449   3            ret = mcf_read32(motorConfig.mcfAddress, CLEAR_FAULT_ADDR, &tempData); //Read Gate Fault Here
+ 450   3            if(ret == true) {
+ 451   4              faultConfig.devCtrlData = 0;
+ 452   4              faultConfig.devCtrlData = tempData;
+ 453   4              faultConfig.faultStage = FAULT_CLEAR_WRITE_WAIT_STAGE;
+ 454   4              faultConfig.faultClearTimeout = FAULT_READ_TIMEOUT;
+ 455   4            } else {
+ 456   4              faultConfig.faultStage         = FAULT_CLEAR_READ_WAIT_STAGE;
+ 457   4              faultConfig.faultClearTimeout = FAULT_CLEAR_WAIT_TIMEOUT;
+ 458   4            }
+ 459   3          }
+ 460   2          break;
+ 461   2      
+ 462   2          case FAULT_CLEAR_WRITE_WAIT_STAGE: {
+ 463   3          }
+ 464   2          break;
+ 465   2      
+ 466   2          case FAULT_CLEAR_WRITE_STAGE: {
+ 467   3            faultConfig.devCtrlData = faultConfig.devCtrlData | (0x20000000); //Set Fault Bit
+ 468   3            ret = mcf_write32(motorConfig.mcfAddress, CLEAR_FAULT_ADDR, faultConfig.devCtrlData);
+ 469   3            if(ret == true) {
+ 470   4              faultConfig.devCtrlData     = 0;
+ 471   4              faultConfig.devCtrlData     = tempData;
+ 472   4              faultConfig.faultStage      = GATE_FAULT_WAIT_STAGE;
+ 473   4              faultConfig.faultClearTimeout = FAULT_CLEAR_WAIT_TIMEOUT;
+ 474   4            } else {
+ 475   4              faultConfig.faultStage      = FAULT_CLEAR_WRITE_WAIT_STAGE;
+ 476   4              faultConfig.faultClearTimeout = FAULT_CLEAR_WAIT_TIMEOUT;
+ 477   4            }
+ 478   3          }
+ 479   2          break;
+ 480   2      
+ 481   2          default: {
+ 482   3      
+ 483   3          } break;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 9   
+
+ 484   2        }
+ 485   1      }
+ 486          
+ 487          /*********************** FAN WATTAGE CONTROL RELATED ************************/
+ 488          void initMcfWattageControlVar(void) {
+ 489   1        fanControlConfig.fanControlStage          = VOLTAGE_CHECK_WAIT_STAGE;
+ 490   1        fanControlConfig.stageChangeTimeout         = 0;
+ 491   1        fanControlConfig.currentSetPwm            = 0;
+ 492   1        fanControlConfig.designatedSpeed        = 0;
+ 493   1        fanControlConfig.fanCurrent             = 0;
+ 494   1        fanControlConfig.fanVoltage             = 0;
+ 495   1        fanControlConfig.fanPower               = 0;
+ 496   1        fanControlConfig.isFanWattageIncreased        = 0;
+ 497   1        fanControlConfig.isFanRpmAverageCheckStarted    = 0;
+ 498   1        fanControlConfig.fanCurrentRpmSettlingCount   = 0;
+ 499   1        fanControlConfig.pwmChange              = 0;
+ 500   1        fanControlConfig.wattageGettingIncreasedCount   = 0;
+ 501   1        fanControlConfig.mcfI2CNackControl            = NOT_STARTED;
+ 502   1        fanControlConfig.isSpeedControlNeedTobeChecked  = 0;
+ 503   1      }
+ 504          
+ 505          void initFanVoltageArray(uint32_t voltageValue) {
+ 506   1        uint8_t i = 0;
+ 507   1        for(i = 0; i< MCF_WATTAGE_CONTROL_ARRAY; i++) {
+ 508   2          mcfVoltageArray[i] = voltageValue;
+ 509   2        }
+ 510   1      }
+ 511          
+ 512          void initFanWattageArray(uint32_t currentWattageValue) {
+ 513   1        uint8_t i = 0;
+ 514   1        for(i = 0; i< MCF_WATTAGE_CONTROL_ARRAY; i++) {
+ 515   2          mcfWattageArray[i] = currentWattageValue; 
+ 516   2        }
+ 517   1      }
+ 518          
+ 519          void initFanSpeedArray(uint16_t fanCurrentRpm) {
+ 520   1        uint8_t i = 0;
+ 521   1        for(i = 0; i< MCF_SPEED_CONTROL_ARRAY; i++) {
+ 522   2          mcfSpeedArray[i] = fanCurrentRpm; 
+ 523   2        }
+ 524   1      }
+ 525          
+ 526          void initiatefanSpeedCurrentCheck (uint16_t speedToBeReached, uint16_t startingPwm) {
+ 527   1        fanControlConfig.isSpeedControlNeedTobeChecked  = 0;
+ 528   1        if(fanControlConfig.fanCurrentRpm == 0) {
+ 529   2          fanControlConfig.fanControlStage          = VOLTAGE_CHECK_WAIT_STAGE;
+ 530   2          fanControlConfig.stageChangeTimeout       = MCF_CURRENT_CHECK_INITIATE_TIME_WAIT_AT_STOP;
+ 531   2          fanControlConfig.pwmChange          = PWM_PERCENTAGE_CHANGE;
+ 532   2        } else {
+ 533   2          fanControlConfig.fanControlStage          = VOLTAGE_CHECK_WAIT_STAGE;
+ 534   2          fanControlConfig.stageChangeTimeout       = MCF_CURRENT_CHECK_INITIATE_TIME_AT_FAN_RUNNING;
+ 535   2      
+ 536   2          if(fanControlConfig.fanCurrentRpm> (speedToBeReached + SPEED_DIFFERENCE_FOR_LONG_CHANGE_IN_SPEED)) {
+ 537   3            fanControlConfig.pwmChange    = MAX_PWM_CHANGE_FOR_FASTER_CONTROL; 
+ 538   3          } else if(speedToBeReached> (fanControlConfig.fanCurrentRpm + SPEED_DIFFERENCE_FOR_LONG_CHANGE_IN_SPEED)
+             -) {
+ 539   3            fanControlConfig.pwmChange    = MAX_PWM_CHANGE_FOR_FASTER_CONTROL; 
+ 540   3          } else {
+ 541   3            fanControlConfig.pwmChange    = PWM_PERCENTAGE_CHANGE; 
+ 542   3          }
+ 543   2        }
+ 544   1      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 10  
+
+ 545   1        fanControlConfig.designatedSpeed          = speedToBeReached;
+ 546   1        fanControlConfig.currentSetPwm            = startingPwm * MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL;
+ 547   1          fanControlConfig.stepsChange            = DEFAULT_STEPS_CHANGE_IN_PWM;
+ 548   1          fanControlConfig.isFanWattageFallen         = 0;
+ 549   1          fanControlConfig.isFanWattageIncreased          = 0;
+ 550   1          fanControlConfig.isFanRpmAverageCheckStarted    = 0;
+ 551   1          fanControlConfig.fanCurrentRpmSettlingCount       = 0;
+ 552   1          fanControlConfig.isFanWattageAverageCheckStarted  = 0;
+ 553   1          fanControlConfig.wattageGettingIncreasedCount     = 0;
+ 554   1        initFanVoltageArray(DEFAULT_SMPS_VOLTAGE_DRIVER_VALUE);
+ 555   1      
+ 556   1        if((speedToBeReached == 0) && (startingPwm == 0)) {
+ 557   2          fanControlConfig.isSpeedControlNeedTobeChecked    = 0;  
+ 558   2        } else {
+ 559   2          fanControlConfig.isSpeedControlNeedTobeChecked    = 1;
+ 560   2        }
+ 561   1      }
+ 562          
+ 563          void initiateOpenLoopFaultCheck() {
+ 564   1        faultConfig.faultClearTimeout = OPEN_LOOP_FAULT_CHECK_WAIT_TIME;
+ 565   1          faultConfig.faultStage = OPEN_LOOP_FAULT_CHECK_WAIT_STAGE;
+ 566   1      }
+ 567          
+ 568          void resetfanSpeedCurrentCheck (void) {
+ 569   1        fanControlConfig.isSpeedControlNeedTobeChecked   = 0;
+ 570   1        fanControlConfig.designatedSpeed         = 0;
+ 571   1        fanControlConfig.fanCurrentRpm           = 0;
+ 572   1        fanControlConfig.currentSetPwm             = 0;
+ 573   1          fanControlConfig.stageChangeTimeout              = 0;
+ 574   1          fanControlConfig.fanControlStage                 = VOLTAGE_CHECK_WAIT_STAGE;
+ 575   1          fanControlConfig.isFanWattageFallen        = 0;
+ 576   1          fanControlConfig.isFanWattageIncreased         = 0;
+ 577   1          fanControlConfig.wattageGettingIncreasedCount    = 0;
+ 578   1          fanControlConfig.isFanRpmAverageCheckStarted   = 0;
+ 579   1          fanControlConfig.fanCurrentRpmSettlingCount    = 0;
+ 580   1          fanControlConfig.isFanWattageAverageCheckStarted = 0;
+ 581   1          fanControlConfig.stepsChange           = DEFAULT_STEPS_CHANGE_IN_PWM;
+ 582   1          fanControlConfig.pwmChange             = PWM_PERCENTAGE_CHANGE;
+ 583   1      }
+ 584          
+ 585          void fanSpeedCurrentHandler(void) {    
+ 586   1          uint8_t  ret       = 0;
+ 587   1        uint32_t tempSpeed = 0;
+ 588   1        uint8_t  isSpeedChangeNeeded = 0;
+ 589   1        uint32_t tempData = 0x00000000;
+ 590   1        uint8_t  pwmChangeMinimalValue = 0; 
+ 591   1        uint32_t stepData = 0;  
+ 592   1          if(fanControlConfig.isSpeedControlNeedTobeChecked == 0) {
+ 593   2              return;
+ 594   2          }
+ 595   1      
+ 596   1          switch(fanControlConfig.fanControlStage) {
+ 597   2              case VOLTAGE_CHECK_WAIT_STAGE : {
+ 598   3              
+ 599   3            }
+ 600   2            break;
+ 601   2      
+ 602   2          case VOLTAGE_CHECK_STAGE: {
+ 603   3            tempData = 0;
+ 604   3                  ret = mcf_read32(motorConfig.mcfAddress, VM_VOLTAGE_ADDR, &tempData);
+ 605   3                  if(ret) {
+ 606   4                    fanControlConfig.mcfI2CNackControl      = NOT_STARTED;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 11  
+
+ 607   4                      fanControlConfig.fanVoltage       = getVoltageDrawnByFan(tempData);
+ 608   4                      fanControlConfig.fanControlStage        = CURRENT_CHECK_WAIT_STAGE;
+ 609   4                      fanControlConfig.stageChangeTimeout     = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 610   4                  } else {
+ 611   4                    if(fanControlConfig.mcfI2CNackControl == NOT_STARTED) {
+ 612   5                    fanControlConfig.mcfI2CNackControl  = IN_COMPLETION;
+ 613   5                  }
+ 614   4                      fanControlConfig.fanControlStage        = MCF_NACK_DEINIT_WAIT_STAGE;
+ 615   4                      fanControlConfig.stageChangeTimeout     = MCF_NACK_RECHECK_TIME;
+ 616   4                  }
+ 617   3          }
+ 618   2          break;
+ 619   2      
+ 620   2              case CURRENT_CHECK_WAIT_STAGE: {
+ 621   3      
+ 622   3              }
+ 623   2              break;
+ 624   2      
+ 625   2              case CURRENT_CHECK_STAGE: {
+ 626   3                  tempData = 0;
+ 627   3                  ret = mcf_read32(motorConfig.mcfAddress, BUS_CURRENT_ADDR, &tempData);
+ 628   3                  if(ret) {
+ 629   4                    fanControlConfig.mcfI2CNackControl    = NOT_STARTED;
+ 630   4                      fanControlConfig.fanCurrent         = getCurrentDrawnByFan(tempData);
+ 631   4                      fanControlConfig.fanControlStage          = WATTAGE_CHECK_STAGE;
+ 632   4                      fanControlConfig.stageChangeTimeout       = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 633   4                  } else {
+ 634   4                    if(fanControlConfig.mcfI2CNackControl == NOT_STARTED) {
+ 635   5                    fanControlConfig.mcfI2CNackControl  = IN_COMPLETION;
+ 636   5                  }
+ 637   4                      fanControlConfig.fanControlStage          = MCF_NACK_DEINIT_WAIT_STAGE;
+ 638   4                      fanControlConfig.stageChangeTimeout       = MCF_NACK_RECHECK_TIME;
+ 639   4                  }
+ 640   3              }
+ 641   2              break;
+ 642   2      
+ 643   2          case WATTAGE_CHECK_STAGE: {
+ 644   3            tempData = 0;
+ 645   3            fanControlConfig.fanPower = getPowerDrawnByFan();
+ 646   3            if(fanControlConfig.fanPower >= MAX_FAN_WATTAGE_ALLOWED) {
+ 647   4                      fanControlConfig.wattageGettingIncreasedCount++;
+ 648   4                      if(fanControlConfig.wattageGettingIncreasedCount == 3) {
+ 649   5                        fanControlConfig.isFanWattageIncreased    = 1;  
+ 650   5                        fanControlConfig.fanControlStage          = WATTAGE_SPEED_UPDATE_WAIT_STAGE;
+ 651   5                        fanControlConfig.stageChangeTimeout       = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 652   5                        fanControlConfig.wattageGettingIncreasedCount = 0;
+ 653   5                      } else {
+ 654   5                        fanControlConfig.fanControlStage          = VOLTAGE_CHECK_WAIT_STAGE;
+ 655   5                        fanControlConfig.stageChangeTimeout       = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 656   5                      }
+ 657   4            } else {
+ 658   4              if(fanControlConfig.isFanWattageFallen == 1) {
+ 659   5                if((fanControlConfig.fanPower<MAX_FAN_WATTAGE_ALLOWED) && 
+ 660   5                  (fanControlConfig.fanPower>(MAX_FAN_WATTAGE_ALLOWED - MIN_CHANGE_IN_WATTAGE_CHANGE))) {
+ 661   6                  fanControlConfig.fanControlStage              = VOLTAGE_CHECK_WAIT_STAGE;
+ 662   6                          fanControlConfig.stageChangeTimeout           = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 663   6                          fanControlConfig.isFanWattageFallen         = 0;
+ 664   6                } else {
+ 665   6                  fanControlConfig.fanControlStage              = SPEED_CHECK_WAIT_STAGE;
+ 666   6                          fanControlConfig.stageChangeTimeout           = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 667   6                }
+ 668   5              } else if(fanControlConfig.isFanWattageIncreased == 1) {
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 12  
+
+ 669   5                if(fanControlConfig.fanPower<(MAX_FAN_WATTAGE_ALLOWED - MIN_CHANGE_IN_WATTAGE_CHANGE)) {
+ 670   6                  fanControlConfig.isFanWattageFallen = 1;
+ 671   6                  fanControlConfig.isFanWattageAverageCheckStarted = 0;
+ 672   6                  fanControlConfig.fanControlStage              = SPEED_CHECK_WAIT_STAGE;
+ 673   6                          fanControlConfig.stageChangeTimeout           = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 674   6                } else { //It is Within Window.....
+ 675   6                  if(fanControlConfig.isFanWattageAverageCheckStarted == 0) {
+ 676   7                    initFanWattageArray(fanControlConfig.fanPower);
+ 677   7                    fanControlConfig.isFanWattageAverageCheckStarted = 1;
+ 678   7                    fanControlConfig.stepsChange    = STEP_CHANGE_ALLOWED_IN_RPM;
+ 679   7                    fanControlConfig.pwmChange      = 0;
+ 680   7                  }
+ 681   6                          fanControlConfig.fanControlStage        = VOLTAGE_CHECK_WAIT_STAGE;
+ 682   6                          fanControlConfig.stageChangeTimeout     = MCF_WATTAGE_SPEED_RECHECK_TIME;
+ 683   6                }
+ 684   5              } else {
+ 685   5                fanControlConfig.fanControlStage          = SPEED_CHECK_WAIT_STAGE;
+ 686   5                        fanControlConfig.stageChangeTimeout       = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 687   5                        fanControlConfig.wattageGettingIncreasedCount = 0;
+ 688   5              }
+ 689   4            }
+ 690   3          }
+ 691   2          break;
+ 692   2              
+ 693   2              case SPEED_CHECK_WAIT_STAGE: {
+ 694   3      
+ 695   3              }
+ 696   2              break;
+ 697   2      
+ 698   2              case SPEED_CHECK_STAGE: {
+ 699   3                tempData = 0;
+ 700   3                  ret = mcf_read32(motorConfig.mcfAddress, FG_SPEED_FDBK_ADDR, &tempData);
+ 701   3                  if(ret) {
+ 702   4                    fanControlConfig.mcfI2CNackControl = NOT_STARTED;
+ 703   4      
+ 704   4                    tempData = getSpeedDrawnByFan(tempData);
+ 705   4                    
+ 706   4                    if(tempData < MAX_SPEEDFDBK_RPM) {
+ 707   5                      fanControlConfig.fanCurrentRpm = tempData;
+ 708   5                    }
+ 709   4      
+ 710   4                    if(fanControlConfig.fanCurrentRpmSettlingCount<MAX_RPM_SETTLING_COUNT) {
+ 711   5                ret =  isfanInSettlingRpm();
+ 712   5                if(ret == true) {
+ 713   6                  fanControlConfig.fanCurrentRpmSettlingCount++;
+ 714   6                } 
+ 715   5              } else {
+ 716   5                fanControlConfig.stepsChange    = STEP_CHANGE_ALLOWED_IN_RPM;
+ 717   5                      fanControlConfig.pwmChange      = 0;
+ 718   5              }
+ 719   4      
+ 720   4              if(isFanSpeedGreater()) {     //if Speed greater Move to Speed Down Stage
+ 721   5                        fanControlConfig.fanControlStage              = SPEEDDOWN_WAIT_STAGE;
+ 722   5                        fanControlConfig.stageChangeTimeout           = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 723   5                      } else if(isFanSpeedLower()) {  //if Speed Lower Move to Speed Up Stage
+ 724   5                        fanControlConfig.fanControlStage              = SPEEDUP_WAIT_STAGE;
+ 725   5                        fanControlConfig.stageChangeTimeout           = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 726   5                      } else {
+ 727   5                          if(fanControlConfig.fanCurrentRpmSettlingCount == MAX_RPM_SETTLING_COUNT) {
+ 728   6                          if(fanControlConfig.isFanRpmAverageCheckStarted == 0) {
+ 729   7                            initFanSpeedArray(fanControlConfig.fanCurrentRpm);
+ 730   7                            fanControlConfig.isFanRpmAverageCheckStarted = 1;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 13  
+
+ 731   7                            fanControlConfig.stepsChange         = STEP_CHANGE_ALLOWED_IN_RPM;
+ 732   7                            fanControlConfig.pwmChange           = 0;
+ 733   7                          }
+ 734   6                          
+ 735   6                          fanControlConfig.fanControlStage           = WATTAGE_SPEED_SETTLED_WAIT_STAGE;
+ 736   6                          fanControlConfig.stageChangeTimeout        = MCF_WATTAGE_SPEED_RECHECK_TIME;
+ 737   6                        } else {
+ 738   6                          fanControlConfig.fanControlStage           = VOLTAGE_CHECK_WAIT_STAGE;
+ 739   6                          fanControlConfig.stageChangeTimeout        = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 740   6                        }
+ 741   5                      }
+ 742   4                  } else {
+ 743   4                    if(fanControlConfig.mcfI2CNackControl == NOT_STARTED) {
+ 744   5                      fanControlConfig.mcfI2CNackControl = IN_COMPLETION;
+ 745   5                    }
+ 746   4                      fanControlConfig.fanControlStage         = MCF_NACK_DEINIT_WAIT_STAGE;
+ 747   4                      fanControlConfig.stageChangeTimeout      = MCF_NACK_RECHECK_TIME;
+ 748   4                  }
+ 749   3              }
+ 750   2              break;
+ 751   2      
+ 752   2              case SPEEDDOWN_WAIT_STAGE: {
+ 753   3                
+ 754   3              }
+ 755   2              break;
+ 756   2      
+ 757   2              case SPEEDDOWN_STAGE: {
+ 758   3            fanControlConfig.currentSetPwm        = fanControlConfig.currentSetPwm - (fanControlConfig.pwmChange*MAX
+             -_PWM_MULTIPLIER_IN_SPEED_CONTROL) - fanControlConfig.stepsChange;
+ 759   3            fanControlConfig.fanControlStage      = VOLTAGE_CHECK_WAIT_STAGE;
+ 760   3                  fanControlConfig.stageChangeTimeout   = MCF_WATTAGE_SPEED_UPDATE_WAIT_TIME;
+ 761   3                  isSpeedChangeNeeded = 1;
+ 762   3              }
+ 763   2              break;
+ 764   2      
+ 765   2              case SPEEDUP_WAIT_STAGE: {
+ 766   3      
+ 767   3              }
+ 768   2              break;
+ 769   2      
+ 770   2              case SPEEDUP_STAGE: {
+ 771   3              fanControlConfig.currentSetPwm      = fanControlConfig.currentSetPwm + (fanControlConfig.pwmChange*M
+             -AX_PWM_MULTIPLIER_IN_SPEED_CONTROL) + fanControlConfig.stepsChange;
+ 772   3            fanControlConfig.fanControlStage    = VOLTAGE_CHECK_WAIT_STAGE;
+ 773   3                  fanControlConfig.stageChangeTimeout = MCF_WATTAGE_SPEED_UPDATE_WAIT_TIME;
+ 774   3                  if(fanControlConfig.currentSetPwm>= (100 * MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL)) {
+ 775   4                    fanControlConfig.currentSetPwm = (100 * MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL);
+ 776   4                  }
+ 777   3                  isSpeedChangeNeeded = 1;
+ 778   3              }
+ 779   2              break;
+ 780   2      
+ 781   2              case WATTAGE_SPEED_UPDATE_WAIT_STAGE: {
+ 782   3      
+ 783   3              }
+ 784   2              break;
+ 785   2      
+ 786   2              case WATTAGE_SPEED_UPDATE_STAGE: {
+ 787   3                fanControlConfig.currentSetPwm      = fanControlConfig.currentSetPwm - (fanControlConfig.pwmChang
+             -e*MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL) - fanControlConfig.stepsChange;
+ 788   3            fanControlConfig.fanControlStage    = VOLTAGE_CHECK_WAIT_STAGE;
+ 789   3                  fanControlConfig.stageChangeTimeout = MCF_WATTAGE_SPEED_UPDATE_WAIT_TIME;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 14  
+
+ 790   3                  isSpeedChangeNeeded = 1;
+ 791   3              }
+ 792   2              break;
+ 793   2      
+ 794   2              case WATTAGE_SPEED_SETTLED_WAIT_STAGE: {
+ 795   3                  
+ 796   3              }
+ 797   2              break;
+ 798   2      
+ 799   2              case WATTAGE_SPEED_SETTLED_STAGE: {
+ 800   3                fanControlConfig.fanControlStage    = VOLTAGE_CHECK_WAIT_STAGE;
+ 801   3                  fanControlConfig.stageChangeTimeout = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 802   3              }
+ 803   2              break;
+ 804   2      
+ 805   2              case MCF_NACK_DEINIT_WAIT_STAGE: {
+ 806   3      
+ 807   3              }  
+ 808   2              break;
+ 809   2      
+ 810   2              case MCF_NACK_DEINIT_STAGE: {
+ 811   3                clr_I2CON_I2CEN;
+ 812   3                fanControlConfig.fanControlStage    = MCF_NACK_WAIT_STAGE;
+ 813   3                  fanControlConfig.stageChangeTimeout = MCF_NACK_RECHECK_TIME;
+ 814   3              }
+ 815   2              break;
+ 816   2      
+ 817   2            case MCF_NACK_WAIT_STAGE: {
+ 818   3                  
+ 819   3              }
+ 820   2              break;
+ 821   2      
+ 822   2              case MCF_NACK_STAGE: {
+ 823   3                Init_I2C();
+ 824   3                fanControlConfig.fanControlStage    = VOLTAGE_CHECK_WAIT_STAGE;
+ 825   3                  fanControlConfig.stageChangeTimeout = MCF_WATTAGE_SPEED_TIME_WAIT;
+ 826   3              }
+ 827   2              break;
+ 828   2      
+ 829   2              default: {
+ 830   3      
+ 831   3              }
+ 832   2              break;
+ 833   2          }
+ 834   1      
+ 835   1          if(fanControlConfig.mcfI2CNackControl == IN_COMPLETION) {
+ 836   2            fanControlConfig.mcfI2CNackControl = COMPLETED;
+ 837   2            ENABLE_PWM0_CH5_P15_OUTPUT;
+ 838   2          P15_PUSHPULL_MODE;
+ 839   2      
+ 840   2          fanControlConfig.fanControlStage      = MCF_NACK_DEINIT_WAIT_STAGE;
+ 841   2              fanControlConfig.stageChangeTimeout   = MCF_NACK_RECHECK_TIME;
+ 842   2          } else {
+ 843   2          if(fanControlConfig.mcfI2CNackControl == NOT_STARTED) {
+ 844   3            if(isSpeedChangeNeeded) {
+ 845   4              if(fanControlConfig.currentSetPwm >= (100* MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL)) {
+ 846   5                DISABLE_PWM0_CH5_P15_OUTPUT;
+ 847   5                P15_PUSHPULL_MODE;
+ 848   5                P15 = 1;
+ 849   5              } else {
+ 850   5                ENABLE_PWM0_CH5_P15_OUTPUT;
+ 851   5                P15_PUSHPULL_MODE;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 15  
+
+ 852   5      
+ 853   5                pwmChangeMinimalValue =  fanControlConfig.currentSetPwm %MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL;
+ 854   5      
+ 855   5                tempSpeed = fanControlConfig.currentSetPwm/MAX_PWM_MULTIPLIER_IN_SPEED_CONTROL;
+ 856   5                tempSpeed = (PWM_FREQ * tempSpeed);
+ 857   5      
+ 858   5                stepData = (PWM_FREQ * pwmChangeMinimalValue); // Calculate the Steps
+ 859   5                stepData = stepData/MAX_STEPS_IN_PWM_CHANGE;
+ 860   5      
+ 861   5                tempSpeed = tempSpeed + stepData;
+ 862   5                tempSpeed = tempSpeed/100;
+ 863   5                setPWMSpeed(tempSpeed);
+ 864   5              }
+ 865   4            }
+ 866   3          }
+ 867   2        }
+ 868   1      }
+ 869          
+ 870          void fanSpeedCurrentTimeHandler(void) {
+ 871   1          if(fanControlConfig.isSpeedControlNeedTobeChecked == 0) {
+ 872   2              return;
+ 873   2          }
+ 874   1      
+ 875   1          if(fanControlConfig.stageChangeTimeout!= 0) {
+ 876   2              fanControlConfig.stageChangeTimeout--;
+ 877   2              if(fanControlConfig.stageChangeTimeout == 0) {
+ 878   3                  switch(fanControlConfig.fanControlStage) {
+ 879   4                    case VOLTAGE_CHECK_WAIT_STAGE: {
+ 880   5                          fanControlConfig.fanControlStage = VOLTAGE_CHECK_STAGE;
+ 881   5                      }
+ 882   4                      break;
+ 883   4      
+ 884   4                      case VOLTAGE_CHECK_STAGE: {
+ 885   5      
+ 886   5                      }
+ 887   4                      break;
+ 888   4      
+ 889   4                      case CURRENT_CHECK_WAIT_STAGE: {
+ 890   5                          fanControlConfig.fanControlStage = CURRENT_CHECK_STAGE;
+ 891   5                      }
+ 892   4                      break;
+ 893   4      
+ 894   4                      case CURRENT_CHECK_STAGE: {
+ 895   5      
+ 896   5                      }
+ 897   4                      break;
+ 898   4      
+ 899   4                    case WATTAGE_CHECK_STAGE: {
+ 900   5      
+ 901   5                    }
+ 902   4                    break;
+ 903   4      
+ 904   4                      case SPEED_CHECK_WAIT_STAGE: {
+ 905   5                        fanControlConfig.fanControlStage = SPEED_CHECK_STAGE;
+ 906   5                      }
+ 907   4                      break;
+ 908   4      
+ 909   4                      case SPEED_CHECK_STAGE: {
+ 910   5                          
+ 911   5                      }
+ 912   4                      break;
+ 913   4      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 16  
+
+ 914   4                      case SPEEDUP_WAIT_STAGE: {
+ 915   5                        fanControlConfig.fanControlStage = SPEEDUP_STAGE;
+ 916   5                  }
+ 917   4                  break;
+ 918   4      
+ 919   4                  case SPEEDUP_STAGE: {
+ 920   5                  }
+ 921   4                  break;
+ 922   4      
+ 923   4                  case SPEEDDOWN_WAIT_STAGE: {
+ 924   5                    fanControlConfig.fanControlStage = SPEEDDOWN_STAGE;
+ 925   5                  }
+ 926   4                  break;
+ 927   4      
+ 928   4                  case SPEEDDOWN_STAGE: {
+ 929   5                  }
+ 930   4                  break;
+ 931   4      
+ 932   4                      case WATTAGE_SPEED_UPDATE_WAIT_STAGE: {
+ 933   5                          fanControlConfig.fanControlStage = WATTAGE_SPEED_UPDATE_STAGE;
+ 934   5                      }
+ 935   4                      break;
+ 936   4      
+ 937   4                      case WATTAGE_SPEED_UPDATE_STAGE: {
+ 938   5      
+ 939   5                      }
+ 940   4                      break;
+ 941   4      
+ 942   4                      case WATTAGE_SPEED_SETTLED_WAIT_STAGE: {
+ 943   5                          fanControlConfig.fanControlStage = WATTAGE_SPEED_SETTLED_STAGE;
+ 944   5                      }
+ 945   4                      break;
+ 946   4      
+ 947   4                      case WATTAGE_SPEED_SETTLED_STAGE: {
+ 948   5      
+ 949   5                      }
+ 950   4                      break;
+ 951   4      
+ 952   4                      case MCF_NACK_DEINIT_WAIT_STAGE: {
+ 953   5                        fanControlConfig.fanControlStage    = MCF_NACK_DEINIT_STAGE;
+ 954   5                  }  
+ 955   4                  break;
+ 956   4      
+ 957   4                  case MCF_NACK_DEINIT_STAGE: {
+ 958   5      
+ 959   5                  }
+ 960   4                  break;
+ 961   4      
+ 962   4                      case MCF_NACK_WAIT_STAGE: {
+ 963   5                      fanControlConfig.fanControlStage = MCF_NACK_STAGE;
+ 964   5                  }
+ 965   4                  break;
+ 966   4      
+ 967   4                  case MCF_NACK_STAGE: {
+ 968   5                    
+ 969   5                  }
+ 970   4                  break;
+ 971   4      
+ 972   4                      default: {
+ 973   5      
+ 974   5                      }
+ 975   4                      break;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 17  
+
+ 976   4                  }
+ 977   3              }
+ 978   2          }
+ 979   1      }
+ 980          
+ 981          uint32_t getVoltageDrawnByFan (uint32_t temp) {
+ 982   1          uint32_t tempVoltage = 0;
+ 983   1          uint32_t tempData = 0;
+ 984   1          uint8_t i = 0;
+ 985   1      
+ 986   1          tempVoltage = temp>>14;
+ 987   1          tempVoltage = tempVoltage * 60;
+ 988   1      
+ 989   1          tempVoltage = tempVoltage>>6;
+ 990   1          tempVoltage = (tempVoltage * 100);
+ 991   1          tempVoltage = tempVoltage>>7;
+ 992   1          
+ 993   1          //Shift the Mcf Voltage Array;
+ 994   1          for(i = 1;i<MCF_WATTAGE_CONTROL_ARRAY;i++) {
+ 995   2            mcfVoltageArray[i - 1] = mcfVoltageArray[i];
+ 996   2          }
+ 997   1      
+ 998   1          mcfVoltageArray[MCF_WATTAGE_CONTROL_ARRAY - 1] = tempVoltage;
+ 999   1          tempData = 0;
+1000   1          for(i = 0; i<MCF_WATTAGE_CONTROL_ARRAY; i++) {
+1001   2            tempData = tempData + mcfVoltageArray[i];
+1002   2          }
+1003   1          tempData = tempData/MCF_WATTAGE_CONTROL_ARRAY;
+1004   1      
+1005   1          return tempData;
+1006   1      }
+1007          
+1008          uint32_t getCurrentDrawnByFan (uint32_t temp) {
+1009   1          uint32_t tempCurrent = 0;
+1010   1          uint32_t errorPrecentOfCurrent = 0;
+1011   1          uint32_t tempData = 0x00000000;
+1012   1          int  i = 0;
+1013   1      
+1014   1          tempCurrent = temp>>13;
+1015   1          tempCurrent = tempCurrent * 6;
+1016   1          tempCurrent = tempCurrent>>7;
+1017   1      
+1018   1          //Total Current = tempCurrent + errorPrecentOfCurrent;
+1019   1          errorPrecentOfCurrent = (tempCurrent * PRECENTAGE_ERROR_IN_CURRENT_CALCULATION);
+1020   1          errorPrecentOfCurrent = errorPrecentOfCurrent/100;
+1021   1          tempCurrent = tempCurrent + errorPrecentOfCurrent;
+1022   1      
+1023   1          return tempCurrent;
+1024   1      }
+1025          
+1026          uint32_t getPowerDrawnByFan(void) {
+1027   1        uint32_t tempPower = 0;
+1028   1        uint8_t  i = 0;
+1029   1        uint32_t tempData = 0;
+1030   1      
+1031   1        tempPower = fanControlConfig.fanVoltage * fanControlConfig.fanCurrent;
+1032   1      
+1033   1        if(fanControlConfig.isFanWattageAverageCheckStarted == 1) { //Shift the Mcf Wattage Array
+1034   2            for(i = 1; i<MCF_WATTAGE_CONTROL_ARRAY; i++) {
+1035   3              mcfWattageArray[i - 1] = mcfWattageArray[i];
+1036   3            }
+1037   2      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 18  
+
+1038   2            mcfWattageArray[MCF_WATTAGE_CONTROL_ARRAY - 1] = tempPower;
+1039   2            tempData = 0;
+1040   2            
+1041   2            for(i = 0;i<MCF_WATTAGE_CONTROL_ARRAY;i++) {
+1042   3              tempData = tempData + mcfWattageArray[i];
+1043   3            }
+1044   2            
+1045   2            tempData = tempData/MCF_WATTAGE_CONTROL_ARRAY;
+1046   2          tempPower = tempData;
+1047   2        }
+1048   1      
+1049   1        return tempPower;
+1050   1      }
+1051          
+1052          int getSpeedDrawnByFan(uint32_t temp) {
+1053   1        uint32_t tempSpeed = 0;
+1054   1        uint8_t  i = 0;
+1055   1        uint32_t tempData = 0;
+1056   1      
+1057   1        i = 0;
+1058   1        tempSpeed = temp>>20;
+1059   1          tempSpeed = tempSpeed * FAN_MAX_SPEED;
+1060   1          tempSpeed = tempSpeed>>7;
+1061   1      
+1062   1          mcfSpeedReadValue = tempSpeed;
+1063   1      
+1064   1          if(fanControlConfig.isFanRpmAverageCheckStarted == 1) {
+1065   2            if((tempSpeed > ((SPEED_ARRAY_FILTER_HIGH_LIMIT_FACTOR*fanControlConfig.fanCurrentRpm)/100)) || (temp
+             -Speed < ((SPEED_ARRAY_FILTER_LOW_LIMIT_FACTOR*fanControlConfig.fanCurrentRpm)/100))) { //If The Speed reported by the Fa
+             -n is Greater Don't Add it in Array
+1066   3              tempSpeed = fanControlConfig.fanCurrentRpm;
+1067   3            }
+1068   2      
+1069   2          for(i = 1; i<MCF_SPEED_CONTROL_ARRAY; i++) { // Add Data In Array
+1070   3              mcfSpeedArray[i - 1] = mcfSpeedArray[i];
+1071   3            }
+1072   2      
+1073   2            mcfSpeedArray[MCF_SPEED_CONTROL_ARRAY - 1] = tempSpeed;
+1074   2            tempData = 0;
+1075   2            
+1076   2            for(i = 0; i<MCF_SPEED_CONTROL_ARRAY; i++) {
+1077   3              tempData = tempData + mcfSpeedArray[i];
+1078   3            }
+1079   2      
+1080   2            tempData = tempData/MCF_SPEED_CONTROL_ARRAY;
+1081   2            tempSpeed = tempData;
+1082   2        }
+1083   1      
+1084   1          return (int)tempSpeed;
+1085   1      }
+1086          
+1087          uint8_t isfanInSettlingRpm(void) {
+1088   1        uint32_t designatedUpperSpeed = 0;
+1089   1        uint32_t designatedLowerSpeed = 0;
+1090   1      
+1091   1        designatedUpperSpeed = fanControlConfig.designatedSpeed * MAX_RPM_SETTLING_PRECENTAGE_ALLOWED;
+1092   1        designatedUpperSpeed = designatedUpperSpeed /100;
+1093   1        designatedUpperSpeed = fanControlConfig.designatedSpeed + designatedUpperSpeed;
+1094   1          
+1095   1        designatedLowerSpeed = fanControlConfig.designatedSpeed * MAX_RPM_SETTLING_PRECENTAGE_ALLOWED;
+1096   1        designatedLowerSpeed = designatedLowerSpeed /100;     
+1097   1        designatedLowerSpeed = fanControlConfig.designatedSpeed - designatedLowerSpeed;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 19  
+
+1098   1      
+1099   1        if(fanControlConfig.fanCurrentRpm <(designatedUpperSpeed) && 
+1100   1          (fanControlConfig.fanCurrentRpm >(designatedLowerSpeed))
+1101   1        ) {
+1102   2          return true;
+1103   2        }
+1104   1        
+1105   1        return false;
+1106   1      }
+1107          
+1108          uint8_t isFanSpeedGreater(void) {
+1109   1        if(fanControlConfig.fanCurrentRpm> (fanControlConfig.designatedSpeed + MAX_DEVIATION_IN_RPM_ALLOWED)) {
+1110   2          return true;
+1111   2        }
+1112   1        return false;
+1113   1      }
+1114          
+1115          uint8_t isFanSpeedLower(void) {
+1116   1        if(fanControlConfig.fanCurrentRpm< (fanControlConfig.designatedSpeed - MAX_DEVIATION_IN_RPM_ALLOWED)) {
+1117   2          return true;
+1118   2        }
+1119   1        return false;
+1120   1      }
+1121          
+1122          /****************************************************************
+1123           *        GLOBAL FUNCTIONS
+1124           * **************************************************************/
+1125          
+1126          uint16_t getCurrentFanRpm(void) {
+1127   1        if(fanControlConfig.fanCurrentRpm) {
+1128   2          return fanControlConfig.fanCurrentRpm;
+1129   2        } else {
+1130   2          return instantRPMValue;
+1131   2        }
+1132   1      }
+1133          
+1134          void setFanSpeed(uint16_t designatedSpeed, uint16_t startPwmDuty, uint8_t direction) {
+1135   1        resetfanSpeedCurrentCheck();
+1136   1        initiateMasterControlCheck(designatedSpeed, startPwmDuty, direction);
+1137   1      }
+1138          
+1139          void initPWMforFanSpeed(void) { 
+1140   1        ENABLE_PWM0_CH5_P15_OUTPUT;
+1141   1        P15_PUSHPULL_MODE;
+1142   1      
+1143   1        PWM0C3H = 0;
+1144   1        PWM0C3L = 0;
+1145   1      
+1146   1          set_PWM0CON0_LOAD;
+1147   1        set_PWM0CON0_PWM0RUN;
+1148   1      
+1149   1        SFRS = 0;
+1150   1        clr_CKCON_PWMCKS; //Clock Source Fsys
+1151   1        PWM0_CLOCK_DIV_8;
+1152   1      
+1153   1        PWM0CON1 &= 0x3F; //Independent Mode
+1154   1        PWM0CON1 &= 0xEF; //Edge Aligned
+1155   1        setPWMSpeed(0);
+1156   1      }
+1157          
+1158          void setPWMSpeed(uint32_t pwm) {
+1159   1        fanRPMPWMValue = pwm;
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 20  
+
+1160   1        ENABLE_PWM0_CH5_P15_OUTPUT;
+1161   1        P15_PUSHPULL_MODE;
+1162   1      
+1163   1        SFRS  = 1;
+1164   1        PWM0C5H = (pwm& 0xFF00)>>8;
+1165   1        SFRS  = 0;
+1166   1      
+1167   1        SFRS  = 1;
+1168   1        PWM0C5L = (pwm& 0x00FF);
+1169   1        SFRS  = 0;
+1170   1      
+1171   1        PWM0PH = PWM_FREQ>>8;
+1172   1          PWM0PL = PWM_FREQ;
+1173   1      
+1174   1          set_PWM0CON0_LOAD;
+1175   1        set_PWM0CON0_PWM0RUN;
+1176   1      }
+1177          
+1178          void FGInterruptInit(void) {
+1179   1        P30_INPUT_MODE;       //setting INT0 pin P3.0 as Quasi mode with internal pull high  
+1180   1        INT0_FALLING_EDGE_TRIG;   //setting trig condition level or edge
+1181   1        set_IE_EX0;                 //INT0_Enable;
+1182   1        ENABLE_GLOBAL_INTERRUPT;    //Global interrupt enable
+1183   1      }
+1184          
+1185          void FG_EXTI_InterruptHandler(void) {
+1186   1        instantRPMValueCalculator();
+1187   1      }
+1188          
+1189          void initMotorControl(void){
+1190   1        initFaultConfig();
+1191   1        initMcfWattageControlVar();
+1192   1        initDriverParamVars();
+1193   1        initFanMasterControl();
+1194   1        Init_I2C();
+1195   1        FGInterruptInit();
+1196   1        initPWMforFanSpeed();
+1197   1      
+1198   1        while(isMotorDriverConfigCheckOver() == 0) {
+1199   2          driverParamsHandler();
+1200   2          resetWatchDog();
+1201   2        }
+1202   1      
+1203   1      }
+1204          
+1205          void motorControlHandler(void){
+1206   1        faultHandler();
+1207   1        fanMasterControlHandler();
+1208   1        fanSpeedCurrentHandler();
+1209   1      }
+1210          
+1211          void motorControlHandlersInTimers(void) {
+1212   1        driverTimeHandler();
+1213   1        faultTimeHandler();
+1214   1        fanSpeedCurrentTimeHandler();
+1215   1        fanMasterControlTimeHandler();
+1216   1        instantanousFGMsCountHandler();
+1217   1      }
+1218          
+1219          void instantanousFGMsCountHandler(void) {
+1220   1        instantFGMsCount++;
+1221   1      
+C51 COMPILER V9.60.7.0   FANMASTERCONTROL                                                  09/12/2024 17:56:56 PAGE 21  
+
+1222   1        if(instantFGMsCount >= 4000) {
+1223   2          instantFGMsCount = 8000;
+1224   2          instantRPMValue = 0;
+1225   2        }
+1226   1      }
+1227          
+1228          void instantRPMValueCalculator(void) {
+1229   1        instantMsCountforFG = instantFGMsCount;
+1230   1        instantFGMsCount = 0;
+1231   1        instantRPMValue = ((60000)/(instantMsCountforFG*POLE_PAIR));
+1232   1      }
+1233          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   5112    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    140     106
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     77    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

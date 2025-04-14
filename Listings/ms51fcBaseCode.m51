@@ -1,0 +1,1919 @@
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                    04/14/2025  22:12:07  PAGE 1
+
+
+BL51 BANKED LINKER/LOCATER V6.22.4.0, INVOKED BY:
+C:\KEIL_V5\C51\BIN\BL51.EXE .\Objects\main.obj, .\Objects\ILI9341.obj, .\Objects\spi.obj, .\Objects\common.obj, .\Object
+>> s\watchdog.obj, .\Objects\sys.obj, .\Objects\STARTUP.obj TO .\Objects\ms51fcBaseCode PRINT (.\Listings\ms51fcBaseCode
+>> .m51) RAMSIZE (256) DISABLEWARNING (16)
+
+
+MEMORY MODEL: LARGE WITH FLOATING POINT ARITHMETIC
+
+
+INPUT MODULES INCLUDED:
+  .\Objects\main.obj (MAIN)
+  .\Objects\ILI9341.obj (ILI9341)
+  .\Objects\spi.obj (SPI)
+  .\Objects\common.obj (COMMON)
+  .\Objects\watchdog.obj (WATCHDOG)
+  .\Objects\sys.obj (SYS)
+  .\Objects\STARTUP.obj (?C_STARTUP)
+  C:\KEIL_V5\C51\LIB\C51FPL.LIB (?C?FPCMP)
+  C:\KEIL_V5\C51\LIB\C51FPL.LIB (?C?FCAST)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C_INIT)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?CLDPTR)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?CLDOPTR)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?IMUL)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?UIDIV)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?IILDX)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?ILDPTR)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?ILDOPTR)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?ISTPTR)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?LMUL)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?ULDIV)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?LNEG)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?ULCMP)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?LSTXDATA)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?LSTKXDATA)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (?C?OFFXADD)
+  C:\KEIL_V5\C51\LIB\C51L.LIB (ABS)
+
+
+LINK MAP OF MODULE:  .\Objects\ms51fcBaseCode (MAIN)
+
+
+            TYPE    BASE      LENGTH    RELOCATION   SEGMENT NAME
+            -----------------------------------------------------
+
+            * * * * * * *   D A T A   M E M O R Y   * * * * * * *
+            REG     0000H     0008H     ABSOLUTE     "REG BANK 0"
+            DATA    0008H     0004H     UNIT         _DATA_GROUP_
+                    000CH     0014H                  *** GAP ***
+            BIT     0020H.0   0000H.1   UNIT         ?BI?COMMON
+            BIT     0020H.1   0000H.1   UNIT         ?BI?_CLOCKDISABLE?SYS
+            BIT     0020H.2   0000H.1   UNIT         _BIT_GROUP_
+                    0020H.3   0000H.5                *** GAP ***
+            IDATA   0021H     0001H     UNIT         ?STACK
+
+            * * * * * * *  X D A T A   M E M O R Y  * * * * * * *
+            XDATA   0000H     0244H     UNIT         _XDATA_GROUP_
+            XDATA   0244H     0219H     UNIT         ?XD?_ILI9341_DRAWICON?ILI9341
+            XDATA   045DH     002AH     UNIT         ?XD?_ILI9341_DRAWHOLLOWELLIPSE?ILI9341
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 2
+
+
+            XDATA   0487H     002AH     UNIT         ?XD?_ILI9341_DRAWFILLEDELLIPSE?ILI9341
+            XDATA   04B1H     0018H     UNIT         ?XD?_ILI9341_DRAWLINE?ILI9341
+            XDATA   04C9H     0018H     UNIT         ?XD?_ILI9341_DRAWFILLEDRECTANGLECOORD?ILI9341
+            XDATA   04E1H     0016H     UNIT         ?XD?_ILI9341_DRAWHOLLOWRECTANGLE?ILI9341
+            XDATA   04F7H     0014H     UNIT         ?XD?_ILI9341_DRAWFILLEDCIRCLE?ILI9341
+            XDATA   050BH     0014H     UNIT         ?XD?_ILI9341_DRAWIMAGE?ILI9341
+            XDATA   051FH     0012H     UNIT         ?XD?_ILI9341_DRAWHOLLOWCIRCLE?ILI9341
+            XDATA   0531H     0008H     UNIT         ?XD?_ILI9341_DRAWHLINE?ILI9341
+            XDATA   0539H     0008H     UNIT         ?XD?_ILI9341_DRAWVLINE?ILI9341
+            XDATA   0541H     0008H     UNIT         ?XD?ILI9341
+            XDATA   0549H     0006H     UNIT         ?XD?_SWAP?ILI9341
+            XDATA   054FH     0002H     UNIT         ?XD?_ILI9341_DRAWCOLOR?ILI9341
+
+            * * * * * * *   C O D E   M E M O R Y   * * * * * * *
+            CODE    0000H     0003H     ABSOLUTE     
+                    0003H     07FDH                  *** GAP ***
+            CODE    0800H     1A02H     UNIT         ?CO?MAIN
+            CODE    2202H     06C1H     UNIT         ?PR?_ILI9341_DRAWHOLLOWELLIPSE?ILI9341
+            CODE    28C3H     0633H     UNIT         ?PR?_ILI9341_DRAWFILLEDELLIPSE?ILI9341
+            CODE    2EF6H     0402H     UNIT         ?PR?_ILI9341_DRAWICON?ILI9341
+            CODE    32F8H     0384H     UNIT         ?PR?_ILI9341_DRAWLINE?ILI9341
+            CODE    367CH     0381H     UNIT         ?C?LIB_CODE
+            CODE    39FDH     037CH     UNIT         ?PR?MAIN?MAIN
+            CODE    3D79H     0213H     UNIT         ?PR?_ILI9341_DRAWHOLLOWCIRCLE?ILI9341
+            CODE    3F8CH     020AH     UNIT         ?PR?_ILI9341_DRAWHOLLOWRECTANGLE?ILI9341
+            CODE    4196H     01E8H     UNIT         ?PR?_ILI9341_DRAWFILLEDCIRCLE?ILI9341
+            CODE    437EH     01B6H     UNIT         ?PR?DISABLE_WDT_RESET_CONFIG?WATCHDOG
+            CODE    4534H     01B4H     UNIT         ?PR?ILI9341_INIT?ILI9341
+            CODE    46E8H     019EH     UNIT         ?PR?_ILI9341_DRAWCOLORBURST?ILI9341
+            CODE    4886H     0188H     UNIT         ?PR?_ILI9341_DRAWIMAGE?ILI9341
+            CODE    4A0EH     017BH     UNIT         ?PR?_ILI9341_DRAWCHAR?ILI9341
+            CODE    4B89H     0165H     UNIT         ?PR?_ILI9341_DRAWFILLEDRECTANGLECOORD?ILI9341
+            CODE    4CEEH     0160H     UNIT         ?PR?_ILI9341_DRAWRECTANGLE?ILI9341
+            CODE    4E4EH     0151H     UNIT         ?PR?_ILI9341_DRAWBMP?ILI9341
+            CODE    4F9FH     0119H     UNIT         ?PR?_MODIFY_HIRC?SYS
+            CODE    50B8H     0114H     UNIT         ?PR?_ILI9341_DRAWHLINE?ILI9341
+            CODE    51CCH     0108H     UNIT         ?PR?_ILI9341_DRAWTEXT?ILI9341
+            CODE    52D4H     00F8H     UNIT         ?PR?_ILI9341_DRAWVLINE?ILI9341
+            CODE    53CCH     00F1H     UNIT         ?PR?_CLOCKENABLE?SYS
+            CODE    54BDH     00F0H     UNIT         ?PR?_ILI9341_DRAWPIXEL?ILI9341
+            CODE    55ADH     009AH     UNIT         ?C_C51STARTUP
+            CODE    5647H     0097H     UNIT         ?PR?_CLOCKSWITCH?SYS
+            CODE    56DEH     008DH     UNIT         ?PR?ENABLE_WDT_RESET_CONFIG?WATCHDOG
+            CODE    576BH     0076H     UNIT         ?PR?_FSYSSELECT?SYS
+            CODE    57E1H     0065H     UNIT         ?PR?_CLOCKDISABLE?SYS
+            CODE    5846H     005EH     UNIT         ?PR?_ILI9341_SETADDRESS?ILI9341
+            CODE    58A4H     005EH     UNIT         ?PR?_ILI9341_SETROTATION?ILI9341
+            CODE    5902H     005DH     UNIT         ?PR?_ILI9341_FILLSCREEN?ILI9341
+            CODE    595FH     0052H     UNIT         ?PR?SPI_INIT?MAIN
+            CODE    59B1H     004BH     UNIT         ?PR?_SWAP?ILI9341
+            CODE    59FCH     0048H     UNIT         ?PR?_SPI_WRITE_BUFF?SPI
+            CODE    5A44H     0022H     UNIT         ?PR?_DELAY?ILI9341
+            CODE    5A66H     001EH     UNIT         ?PR?_DELAY?MAIN
+            CODE    5A84H     0017H     UNIT         ?PR?_ILI9341_DRAWCOLOR?ILI9341
+            CODE    5A9BH     0014H     UNIT         ?PR?_ILI9341_WRITEBUFFER?ILI9341
+            CODE    5AAFH     0010H     UNIT         ?PR?_SPI_READ_BYTE?SPI
+            CODE    5ABFH     000FH     UNIT         ?PR?ILI9341_RESET?ILI9341
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 3
+
+
+            CODE    5ACEH     000FH     UNIT         ?C_INITSEG
+            CODE    5ADDH     000EH     UNIT         ?PR?_SPI_WRITE_BYTE?SPI
+            CODE    5AEBH     000CH     UNIT         ?PR?_ABS?ABS
+            CODE    5AF7H     000AH     UNIT         ?PR?_ILI9341_WRITECOMMAND?ILI9341
+            CODE    5B01H     000AH     UNIT         ?PR?_ILI9341_WRITEDATA?ILI9341
+            CODE    5B0BH     0008H     UNIT         ?PR?_READ_APROM_BYTE?COMMON
+            CODE    5B13H     0003H     UNIT         ?PR?ILI9341_ENABLE?ILI9341
+
+
+
+OVERLAY MAP OF MODULE:   .\Objects\ms51fcBaseCode (MAIN)
+
+
+SEGMENT                                             BIT_GROUP          DATA_GROUP          XDATA_GROUP
+  +--> CALLED SEGMENT                            START    LENGTH     START    LENGTH     START    LENGTH
+--------------------------------------------------------------------------------------------------------
+?C_C51STARTUP                                    -----    -----      -----    -----      -----    -----
+  +--> ?PR?MAIN?MAIN
+  +--> ?C_INITSEG
+
+?PR?MAIN?MAIN                                    -----    -----      -----    -----      -----    -----
+  +--> ?PR?_FSYSSELECT?SYS
+  +--> ?PR?_MODIFY_HIRC?SYS
+  +--> ?PR?SPI_INIT?MAIN
+  +--> ?PR?ILI9341_INIT?ILI9341
+  +--> ?PR?_ILI9341_SETROTATION?ILI9341
+  +--> ?PR?_ILI9341_FILLSCREEN?ILI9341
+  +--> ?CO?MAIN
+  +--> ?PR?_ILI9341_DRAWBMP?ILI9341
+  +--> ?PR?_ILI9341_DRAWTEXT?ILI9341
+  +--> ?PR?_DELAY?MAIN
+
+?PR?_FSYSSELECT?SYS                              -----    -----      -----    -----      -----    -----
+  +--> ?PR?_CLOCKENABLE?SYS
+  +--> ?PR?_CLOCKSWITCH?SYS
+
+?PR?_CLOCKSWITCH?SYS                             0020H.2  0000H.1    -----    -----      -----    -----
+
+?PR?_MODIFY_HIRC?SYS                             -----    -----      0008H    0004H      -----    -----
+
+?PR?ILI9341_INIT?ILI9341                         -----    -----      -----    -----      -----    -----
+  +--> ?PR?ILI9341_ENABLE?ILI9341
+  +--> ?PR?ILI9341_RESET?ILI9341
+  +--> ?PR?_ILI9341_WRITECOMMAND?ILI9341
+  +--> ?PR?_DELAY?ILI9341
+  +--> ?PR?_ILI9341_WRITEDATA?ILI9341
+  +--> ?PR?_ILI9341_SETROTATION?ILI9341
+
+?PR?ILI9341_RESET?ILI9341                        -----    -----      -----    -----      -----    -----
+  +--> ?PR?_DELAY?ILI9341
+
+?PR?_ILI9341_WRITECOMMAND?ILI9341                -----    -----      -----    -----      -----    -----
+  +--> ?PR?_SPI_WRITE_BYTE?SPI
+
+?PR?_ILI9341_WRITEDATA?ILI9341                   -----    -----      -----    -----      -----    -----
+  +--> ?PR?_SPI_WRITE_BYTE?SPI
+
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 4
+
+
+?PR?_ILI9341_SETROTATION?ILI9341                 -----    -----      -----    -----      0000H    0001H
+  +--> ?PR?_ILI9341_WRITECOMMAND?ILI9341
+  +--> ?PR?_DELAY?ILI9341
+  +--> ?PR?_ILI9341_WRITEDATA?ILI9341
+
+?PR?_ILI9341_FILLSCREEN?ILI9341                  -----    -----      -----    -----      0000H    0002H
+  +--> ?PR?_ILI9341_SETADDRESS?ILI9341
+  +--> ?PR?_ILI9341_DRAWCOLORBURST?ILI9341
+
+?PR?_ILI9341_SETADDRESS?ILI9341                  -----    -----      -----    -----      0030H    000CH
+  +--> ?PR?_ILI9341_WRITECOMMAND?ILI9341
+  +--> ?PR?_ILI9341_WRITEBUFFER?ILI9341
+
+?PR?_ILI9341_WRITEBUFFER?ILI9341                 -----    -----      -----    -----      -----    -----
+  +--> ?PR?_SPI_WRITE_BUFF?SPI
+
+?PR?_SPI_WRITE_BUFF?SPI                          -----    -----      -----    -----      023FH    0005H
+
+?PR?_ILI9341_DRAWCOLORBURST?ILI9341              -----    -----      -----    -----      0030H    020FH
+  +--> ?PR?_SPI_WRITE_BUFF?SPI
+
+?PR?_ILI9341_DRAWBMP?ILI9341                     -----    -----      -----    -----      0000H    0019H
+  +--> ?PR?_ILI9341_SETADDRESS?ILI9341
+  +--> ?PR?_SPI_WRITE_BUFF?SPI
+
+?PR?_ILI9341_DRAWTEXT?ILI9341                    -----    -----      -----    -----      0000H    0010H
+  +--> ?PR?_ILI9341_DRAWCHAR?ILI9341
+
+?PR?_ILI9341_DRAWCHAR?ILI9341                    -----    -----      -----    -----      0010H    0016H
+  +--> ?PR?_ILI9341_DRAWRECTANGLE?ILI9341
+  +--> ?PR?_ILI9341_DRAWPIXEL?ILI9341
+
+?PR?_ILI9341_DRAWRECTANGLE?ILI9341               -----    -----      -----    -----      0026H    000AH
+  +--> ?PR?_ILI9341_SETADDRESS?ILI9341
+  +--> ?PR?_ILI9341_DRAWCOLORBURST?ILI9341
+
+?PR?_ILI9341_DRAWPIXEL?ILI9341                   -----    -----      -----    -----      0026H    0010H
+  +--> ?PR?_ILI9341_WRITECOMMAND?ILI9341
+  +--> ?PR?_ILI9341_WRITEBUFFER?ILI9341
+
+
+
+SYMBOL TABLE OF MODULE:  .\Objects\ms51fcBaseCode (MAIN)
+
+  VALUE           TYPE          NAME
+  ----------------------------------
+
+  -------         MODULE        MAIN
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  D:00B1H         PUBLIC        P0M1
+  D:00B3H         PUBLIC        P1M1
+  D:00B2H         PUBLIC        P0M2
+  D:0080H         PUBLIC        P0
+  D:00B4H         PUBLIC        P1M2
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  D:00B0H         PUBLIC        P3
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 5
+
+
+  D:00A8H         PUBLIC        IE
+  C:5A66H         PUBLIC        _delay
+  C:10BEH         PUBLIC        Arial_Narrow15x19
+  D:00B8H         PUBLIC        IP
+  C:0C18H         PUBLIC        fan40
+  C:39FDH         PUBLIC        main
+  C:0CE0H         PUBLIC        rect
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  C:0820H         PUBLIC        fan3_48
+  D:00D8H         PUBLIC        PWM0CON0
+  D:00F3H         PUBLIC        SPCR
+  C:0A08H         PUBLIC        power_icon
+  D:0091H         PUBLIC        SFRS
+  D:00F8H         PUBLIC        SCON_1
+  D:00F4H         PUBLIC        SPSR
+  D:00E8H         PUBLIC        ADCCON0
+  D:00C0H         PUBLIC        I2CON
+  C:0940H         PUBLIC        lightbulb_off
+  C:595FH         PUBLIC        SPI_Init
+  D:00C8H         PUBLIC        T2CON
+  C:0A88H         PUBLIC        chimney
+  C:0B50H         PUBLIC        fry_pan
+  D:00D0H         PUBLIC        PSW
+  -------         PROC          _DELAY
+  D:0006H         SYMBOL        count
+  -------         DO            
+  D:0004H         SYMBOL        i
+  -------         ENDDO         
+  C:5A66H         LINE#         8
+  C:5A66H         LINE#         10
+  C:5A70H         LINE#         11
+  C:5A83H         LINE#         12
+  C:5A83H         LINE#         13
+  -------         ENDPROC       _DELAY
+  -------         PROC          SPI_INIT
+  C:595FH         LINE#         15
+  C:595FH         LINE#         16
+  C:5968H         LINE#         17
+  C:5970H         LINE#         18
+  C:5978H         LINE#         19
+  C:5980H         LINE#         21
+  C:5985H         LINE#         22
+  C:598AH         LINE#         24
+  C:598FH         LINE#         26
+  C:5994H         LINE#         27
+  C:5999H         LINE#         29
+  C:599EH         LINE#         30
+  C:59A6H         LINE#         31
+  C:59ABH         LINE#         32
+  C:59B0H         LINE#         33
+  -------         ENDPROC       SPI_INIT
+  -------         PROC          MAIN
+  C:39FDH         LINE#         36
+  C:39FDH         LINE#         37
+  C:3A02H         LINE#         38
+  C:3A07H         LINE#         40
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 6
+
+
+  C:3A0AH         LINE#         41
+  C:3A0DH         LINE#         42
+  C:3A12H         LINE#         43
+  C:3A18H         LINE#         45
+  C:3A46H         LINE#         46
+  C:3A74H         LINE#         47
+  C:3AA2H         LINE#         48
+  C:3AD0H         LINE#         49
+  C:3AFEH         LINE#         50
+  C:3B2CH         LINE#         58
+  C:3B5AH         LINE#         59
+  C:3B88H         LINE#         60
+  C:3BB6H         LINE#         61
+  C:3BE4H         LINE#         62
+  C:3C13H         LINE#         63
+  C:3C42H         LINE#         67
+  C:3C74H         LINE#         68
+  C:3CA6H         LINE#         69
+  C:3CD8H         LINE#         70
+  C:3D0AH         LINE#         71
+  C:3D3DH         LINE#         72
+  C:3D70H         LINE#         76
+  C:3D77H         LINE#         79
+  C:3D77H         LINE#         80
+  -------         ENDPROC       MAIN
+  -------         ENDMOD        MAIN
+
+  -------         MODULE        ILI9341
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  C:5AA5H         PUBLIC        _ILI9341_WriteBuffer
+  C:5902H         PUBLIC        _ILI9341_FillScreen
+  D:0080H         PUBLIC        P0
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  C:4E4EH         PUBLIC        _ILI9341_DrawBMP
+  D:00B0H         PUBLIC        P3
+  C:52D4H         PUBLIC        _ILI9341_DrawVLine
+  C:4886H         PUBLIC        _ILI9341_DrawImage
+  C:584BH         PUBLIC        _ILI9341_SetAddress
+  C:4B89H         PUBLIC        _ILI9341_DrawFilledRectangleCoord
+  D:00A8H         PUBLIC        IE
+  C:5A48H         SYMBOL        _delay
+  C:58A4H         PUBLIC        _ILI9341_SetRotation
+  C:5ABFH         PUBLIC        ILI9341_Reset
+  D:00B8H         PUBLIC        IP
+  C:5B01H         PUBLIC        _ILI9341_WriteData
+  C:4A0EH         PUBLIC        _ILI9341_DrawChar
+  C:5A84H         PUBLIC        _ILI9341_DrawColor
+  C:54DBH         PUBLIC        _ILI9341_DrawPixel
+  C:4534H         PUBLIC        ILI9341_Init
+  C:32F8H         PUBLIC        _ILI9341_DrawLine
+  C:2EF6H         PUBLIC        _ILI9341_DrawIcon
+  B:0090H.1       PUBLIC        P11
+  B:0090H.2       PUBLIC        P12
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  X:0541H         PUBLIC        LCD_WIDTH
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 7
+
+
+  B:0090H.5       PUBLIC        P15
+  D:00D8H         PUBLIC        PWM0CON0
+  C:3F8CH         PUBLIC        _ILI9341_DrawHollowRectangle
+  C:46EDH         PUBLIC        _ILI9341_DrawColorBurst
+  C:59B9H         SYMBOL        _swap
+  C:4CEEH         PUBLIC        _ILI9341_DrawRectangle
+  D:00F8H         PUBLIC        SCON_1
+  C:51CCH         PUBLIC        _ILI9341_DrawText
+  C:28C3H         PUBLIC        _ILI9341_DrawFilledEllipse
+  C:4196H         PUBLIC        _ILI9341_DrawFilledCircle
+  D:00E8H         PUBLIC        ADCCON0
+  C:5B13H         PUBLIC        ILI9341_Enable
+  D:00C0H         PUBLIC        I2CON
+  C:5AF7H         PUBLIC        _ILI9341_WriteCommand
+  D:00C8H         PUBLIC        T2CON
+  X:0545H         PUBLIC        LCD_HEIGHT
+  C:2202H         PUBLIC        _ILI9341_DrawHollowEllipse
+  C:3D79H         PUBLIC        _ILI9341_DrawHollowCircle
+  C:50D8H         PUBLIC        _ILI9341_DrawHLine
+  D:00D0H         PUBLIC        PSW
+  -------         PROC          L?0235
+  -------         ENDPROC       L?0235
+  -------         PROC          _SWAP
+  X:0549H         SYMBOL        a
+  X:054CH         SYMBOL        b
+  -------         DO            
+  D:0006H         SYMBOL        temp
+  -------         ENDDO         
+  C:59B9H         LINE#         18
+  C:59C4H         LINE#         19
+  C:59CAH         LINE#         20
+  C:59EBH         LINE#         21
+  -------         ENDPROC       _SWAP
+  C:5A44H         SYMBOL        L?0234
+  -------         PROC          L?0233
+  -------         ENDPROC       L?0233
+  C:5A44H         SYMBOL        L?0234
+  -------         PROC          _DELAY
+  D:0006H         SYMBOL        count
+  -------         DO            
+  D:0004H         SYMBOL        i
+  -------         ENDDO         
+  C:5A48H         LINE#         24
+  C:5A48H         LINE#         26
+  C:5A52H         LINE#         27
+  C:5A65H         LINE#         28
+  C:5A65H         LINE#         29
+  -------         ENDPROC       _DELAY
+  -------         PROC          _ILI9341_WRITECOMMAND
+  D:0007H         SYMBOL        cmd
+  C:5AF7H         LINE#         31
+  C:5AF7H         LINE#         32
+  C:5AF9H         LINE#         33
+  C:5AFBH         LINE#         34
+  C:5AFEH         LINE#         35
+  C:5B00H         LINE#         36
+  -------         ENDPROC       _ILI9341_WRITECOMMAND
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 8
+
+
+  -------         PROC          _ILI9341_WRITEDATA
+  D:0007H         SYMBOL        dat
+  C:5B01H         LINE#         38
+  C:5B01H         LINE#         39
+  C:5B03H         LINE#         40
+  C:5B05H         LINE#         41
+  C:5B08H         LINE#         42
+  C:5B0AH         LINE#         43
+  -------         ENDPROC       _ILI9341_WRITEDATA
+  C:5A9FH         SYMBOL        L?0227
+  C:5AA1H         SYMBOL        L?0228
+  -------         PROC          L?0226
+  -------         ENDPROC       L?0226
+  C:5A9FH         SYMBOL        L?0227
+  C:5AA1H         SYMBOL        L?0228
+  -------         PROC          _ILI9341_WRITEBUFFER
+  D:0001H         SYMBOL        buffer
+  D:0004H         SYMBOL        len
+  C:5AA5H         LINE#         46
+  C:5AA5H         LINE#         47
+  C:5AA7H         LINE#         48
+  C:5AA9H         LINE#         49
+  C:5AACH         LINE#         50
+  C:5AAEH         LINE#         51
+  -------         ENDPROC       _ILI9341_WRITEBUFFER
+  C:5846H         SYMBOL        L?0230
+  -------         PROC          L?0229
+  -------         ENDPROC       L?0229
+  C:5846H         SYMBOL        L?0230
+  -------         PROC          _ILI9341_SETADDRESS
+  X:0030H         SYMBOL        x1
+  X:0032H         SYMBOL        y1
+  D:0002H         SYMBOL        x2
+  X:0036H         SYMBOL        y2
+  -------         DO            
+  X:0038H         SYMBOL        buffer
+  -------         ENDDO         
+  C:584BH         LINE#         53
+  C:5859H         LINE#         55
+  C:5866H         LINE#         56
+  C:5869H         LINE#         57
+  C:586CH         LINE#         58
+  C:586FH         LINE#         60
+  C:5874H         LINE#         61
+  C:5877H         LINE#         63
+  C:5884H         LINE#         64
+  C:5887H         LINE#         65
+  C:5894H         LINE#         66
+  C:5897H         LINE#         68
+  C:589CH         LINE#         69
+  C:589FH         LINE#         70
+  -------         ENDPROC       _ILI9341_SETADDRESS
+  -------         PROC          ILI9341_RESET
+  C:5ABFH         LINE#         73
+  C:5ABFH         LINE#         74
+  C:5AC1H         LINE#         75
+  C:5AC4H         LINE#         76
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 9
+
+
+  C:5AC6H         LINE#         77
+  C:5AC9H         LINE#         78
+  C:5ACBH         LINE#         79
+  C:5ACDH         LINE#         80
+  -------         ENDPROC       ILI9341_RESET
+  -------         PROC          ILI9341_ENABLE
+  C:5B13H         LINE#         82
+  C:5B13H         LINE#         83
+  C:5B15H         LINE#         84
+  -------         ENDPROC       ILI9341_ENABLE
+  -------         PROC          ILI9341_INIT
+  C:4534H         LINE#         86
+  C:4534H         LINE#         87
+  C:4537H         LINE#         88
+  C:453AH         LINE#         91
+  C:453FH         LINE#         92
+  C:4542H         LINE#         95
+  C:4547H         LINE#         96
+  C:454CH         LINE#         97
+  C:4551H         LINE#         98
+  C:4556H         LINE#         99
+  C:455BH         LINE#         100
+  C:4560H         LINE#         103
+  C:4565H         LINE#         104
+  C:456AH         LINE#         105
+  C:456FH         LINE#         106
+  C:4574H         LINE#         109
+  C:4579H         LINE#         110
+  C:457EH         LINE#         111
+  C:4583H         LINE#         112
+  C:4588H         LINE#         115
+  C:458DH         LINE#         116
+  C:4592H         LINE#         117
+  C:4597H         LINE#         120
+  C:459CH         LINE#         121
+  C:45A1H         LINE#         122
+  C:45A6H         LINE#         123
+  C:45ABH         LINE#         124
+  C:45B0H         LINE#         127
+  C:45B5H         LINE#         128
+  C:45BAH         LINE#         131
+  C:45BFH         LINE#         132
+  C:45C4H         LINE#         135
+  C:45C9H         LINE#         136
+  C:45CEH         LINE#         139
+  C:45D3H         LINE#         140
+  C:45D8H         LINE#         141
+  C:45DDH         LINE#         144
+  C:45E2H         LINE#         145
+  C:45E7H         LINE#         148
+  C:45ECH         LINE#         149
+  C:45F1H         LINE#         152
+  C:45F6H         LINE#         153
+  C:45FBH         LINE#         156
+  C:4600H         LINE#         157
+  C:4605H         LINE#         158
+  C:460AH         LINE#         161
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 10
+
+
+  C:460FH         LINE#         162
+  C:4614H         LINE#         163
+  C:4619H         LINE#         164
+  C:461EH         LINE#         167
+  C:4623H         LINE#         168
+  C:4628H         LINE#         171
+  C:462DH         LINE#         172
+  C:4632H         LINE#         175
+  C:4637H         LINE#         176
+  C:463CH         LINE#         177
+  C:4641H         LINE#         178
+  C:4646H         LINE#         179
+  C:464BH         LINE#         180
+  C:4650H         LINE#         181
+  C:4655H         LINE#         182
+  C:465AH         LINE#         183
+  C:465FH         LINE#         184
+  C:4664H         LINE#         185
+  C:4669H         LINE#         186
+  C:466EH         LINE#         187
+  C:4673H         LINE#         188
+  C:4678H         LINE#         189
+  C:467DH         LINE#         190
+  C:4682H         LINE#         193
+  C:4687H         LINE#         194
+  C:468CH         LINE#         195
+  C:4691H         LINE#         196
+  C:4696H         LINE#         197
+  C:469BH         LINE#         198
+  C:46A0H         LINE#         199
+  C:46A5H         LINE#         200
+  C:46AAH         LINE#         201
+  C:46AFH         LINE#         202
+  C:46B4H         LINE#         203
+  C:46B9H         LINE#         204
+  C:46BEH         LINE#         205
+  C:46C3H         LINE#         206
+  C:46C8H         LINE#         207
+  C:46CDH         LINE#         208
+  C:46D2H         LINE#         211
+  C:46D7H         LINE#         212
+  C:46DEH         LINE#         215
+  C:46E3H         LINE#         218
+  -------         ENDPROC       ILI9341_INIT
+  -------         PROC          _ILI9341_SETROTATION
+  X:0000H         SYMBOL        rotation
+  C:58A4H         LINE#         221
+  C:58A9H         LINE#         222
+  C:58AEH         LINE#         223
+  C:58B5H         LINE#         225
+  C:58C6H         LINE#         226
+  C:58C6H         LINE#         227
+  C:58C8H         LINE#         228
+  C:58C8H         LINE#         229
+  C:58C8H         LINE#         230
+  C:58CAH         LINE#         231
+  C:58CAH         LINE#         232
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 11
+
+
+  C:58CCH         LINE#         233
+  C:58CCH         LINE#         234
+  C:58CCH         LINE#         235
+  C:58CEH         LINE#         236
+  C:58CEH         LINE#         237
+  C:58D3H         LINE#         238
+  C:58DDH         LINE#         239
+  C:58E7H         LINE#         240
+  C:58E8H         LINE#         241
+  C:58E8H         LINE#         242
+  C:58EDH         LINE#         243
+  C:58F7H         LINE#         244
+  C:5901H         LINE#         245
+  C:5901H         LINE#         246
+  C:5901H         LINE#         247
+  C:5901H         LINE#         248
+  C:5901H         LINE#         249
+  -------         ENDPROC       _ILI9341_SETROTATION
+  -------         PROC          _ILI9341_DRAWCOLOR
+  D:0004H         SYMBOL        color
+  -------         DO            
+  X:054FH         SYMBOL        buffer
+  -------         ENDDO         
+  C:5A84H         LINE#         252
+  C:5A86H         LINE#         254
+  C:5A8BH         LINE#         255
+  C:5A8EH         LINE#         256
+  -------         ENDPROC       _ILI9341_DRAWCOLOR
+  C:46E8H         SYMBOL        L?0232
+  -------         PROC          L?0231
+  -------         ENDPROC       L?0231
+  C:46E8H         SYMBOL        L?0232
+  -------         PROC          _ILI9341_DRAWCOLORBURST
+  X:0030H         SYMBOL        color
+  X:0032H         SYMBOL        siz
+  -------         DO            
+  X:0036H         SYMBOL        BufferSize
+  X:003AH         SYMBOL        chifted
+  X:003BH         SYMBOL        SendingSize
+  X:003FH         SYMBOL        SendingInBlock
+  X:0043H         SYMBOL        RemainderFromBlock
+  X:0047H         SYMBOL        j
+  X:004BH         SYMBOL        BurstBuffer
+  -------         ENDDO         
+  C:46EDH         LINE#         259
+  C:46F5H         LINE#         260
+  C:46FFH         LINE#         276
+  C:4701H         LINE#         277
+  C:4703H         LINE#         279
+  C:470BH         LINE#         282
+  C:4737H         LINE#         283
+  C:4751H         LINE#         284
+  C:4763H         LINE#         285
+  C:4784H         LINE#         287
+  C:47A1H         LINE#         288
+  C:47C6H         LINE#         289
+  C:47F3H         LINE#         291
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 12
+
+
+  C:480CH         LINE#         292
+  C:4838H         LINE#         293
+  C:484DH         LINE#         294
+  C:486EH         LINE#         295
+  C:486EH         LINE#         296
+  C:4883H         LINE#         297
+  C:4885H         LINE#         298
+  -------         ENDPROC       _ILI9341_DRAWCOLORBURST
+  -------         PROC          _ILI9341_FILLSCREEN
+  X:0000H         SYMBOL        color
+  C:5902H         LINE#         300
+  C:590AH         LINE#         301
+  C:592FH         LINE#         302
+  -------         ENDPROC       _ILI9341_FILLSCREEN
+  C:54C0H         SYMBOL        L?0219
+  C:54C1H         SYMBOL        L?0220
+  C:54D2H         SYMBOL        L?0221
+  C:54D5H         SYMBOL        L?0222
+  C:54D6H         SYMBOL        L?0223
+  -------         PROC          L?0218
+  -------         ENDPROC       L?0218
+  C:54C0H         SYMBOL        L?0219
+  C:54C1H         SYMBOL        L?0220
+  C:54D2H         SYMBOL        L?0221
+  C:54D5H         SYMBOL        L?0222
+  C:54D6H         SYMBOL        L?0223
+  -------         PROC          _ILI9341_DRAWPIXEL
+  X:0026H         SYMBOL        x
+  X:0028H         SYMBOL        y
+  X:002AH         SYMBOL        color
+  -------         DO            
+  X:002CH         SYMBOL        bufferX
+  X:0030H         SYMBOL        bufferY
+  X:0034H         SYMBOL        bufferC
+  -------         ENDDO         
+  C:54DBH         LINE#         305
+  C:54EFH         LINE#         309
+  C:5530H         LINE#         311
+  C:553DH         LINE#         312
+  C:5540H         LINE#         313
+  C:554CH         LINE#         314
+  C:5550H         LINE#         316
+  C:555DH         LINE#         317
+  C:5560H         LINE#         318
+  C:556CH         LINE#         319
+  C:5570H         LINE#         321
+  C:557DH         LINE#         322
+  C:5580H         LINE#         325
+  C:5585H         LINE#         326
+  C:558CH         LINE#         328
+  C:5591H         LINE#         329
+  C:559AH         LINE#         331
+  C:559FH         LINE#         332
+  C:55ACH         LINE#         333
+  -------         ENDPROC       _ILI9341_DRAWPIXEL
+  -------         PROC          _ILI9341_DRAWRECTANGLE
+  X:0026H         SYMBOL        x
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 13
+
+
+  X:0028H         SYMBOL        y
+  X:002AH         SYMBOL        width
+  X:002CH         SYMBOL        height
+  X:002EH         SYMBOL        color
+  C:4CEEH         LINE#         335
+  C:4D02H         LINE#         336
+  C:4D46H         LINE#         338
+  C:4D77H         LINE#         339
+  C:4D96H         LINE#         340
+  C:4D96H         LINE#         342
+  C:4DC7H         LINE#         343
+  C:4DE6H         LINE#         344
+  C:4DE6H         LINE#         346
+  C:4E2DH         LINE#         347
+  C:4E4DH         LINE#         348
+  -------         ENDPROC       _ILI9341_DRAWRECTANGLE
+  C:50D3H         SYMBOL        L?0225
+  -------         PROC          L?0224
+  -------         ENDPROC       L?0224
+  C:50D3H         SYMBOL        L?0225
+  -------         PROC          _ILI9341_DRAWHLINE
+  X:0531H         SYMBOL        x
+  X:0533H         SYMBOL        y
+  X:0535H         SYMBOL        width
+  X:0537H         SYMBOL        color
+  C:50D8H         LINE#         351
+  C:50ECH         LINE#         352
+  C:5130H         LINE#         354
+  C:5161H         LINE#         355
+  C:5180H         LINE#         356
+  C:5180H         LINE#         358
+  C:51B4H         LINE#         359
+  C:51CBH         LINE#         360
+  -------         ENDPROC       _ILI9341_DRAWHLINE
+  -------         PROC          _ILI9341_DRAWLINE
+  X:04B1H         SYMBOL        x0
+  X:04B3H         SYMBOL        y0
+  X:04B5H         SYMBOL        x1
+  X:04B7H         SYMBOL        y1
+  X:04B9H         SYMBOL        color
+  -------         DO            
+  X:04BBH         SYMBOL        dx
+  X:04BDH         SYMBOL        dy
+  X:04BFH         SYMBOL        err
+  X:04C1H         SYMBOL        ystep
+  X:04C3H         SYMBOL        xs
+  X:04C5H         SYMBOL        dlen
+  X:04C7H         SYMBOL        steep
+  -------         ENDDO         
+  C:32F8H         LINE#         362
+  C:330CH         LINE#         366
+  C:3361H         LINE#         369
+  C:3364H         LINE#         370
+  C:3373H         LINE#         371
+  C:338AH         LINE#         372
+  C:338AH         LINE#         374
+  C:339FH         LINE#         375
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 14
+
+
+  C:33AEH         LINE#         376
+  C:33C5H         LINE#         377
+  C:33C5H         LINE#         379
+  C:3400H         LINE#         381
+  C:342CH         LINE#         383
+  C:3449H         LINE#         386
+  C:3456H         LINE#         387
+  C:346EH         LINE#         388
+  C:347CH         LINE#         389
+  C:3495H         LINE#         390
+  C:349EH         LINE#         391
+  C:34C2H         LINE#         392
+  C:34EAH         LINE#         393
+  C:34F1H         LINE#         394
+  C:3519H         LINE#         395
+  C:352DH         LINE#         396
+  C:352DH         LINE#         397
+  C:353EH         LINE#         398
+  C:356EH         LINE#         399
+  C:356EH         LINE#         401
+  C:356EH         LINE#         402
+  C:3586H         LINE#         403
+  C:3594H         LINE#         404
+  C:35ADH         LINE#         405
+  C:35B6H         LINE#         406
+  C:35DAH         LINE#         407
+  C:35FFH         LINE#         408
+  C:3606H         LINE#         409
+  C:362EH         LINE#         410
+  C:3642H         LINE#         411
+  C:3642H         LINE#         412
+  C:3653H         LINE#         413
+  C:367BH         LINE#         414
+  C:367BH         LINE#         416
+  -------         ENDPROC       _ILI9341_DRAWLINE
+  -------         PROC          _ILI9341_DRAWVLINE
+  X:0539H         SYMBOL        x
+  X:053BH         SYMBOL        y
+  X:053DH         SYMBOL        height
+  X:053FH         SYMBOL        color
+  C:52D4H         LINE#         418
+  C:52E8H         LINE#         419
+  C:532CH         LINE#         421
+  C:535DH         LINE#         422
+  C:537AH         LINE#         423
+  C:537AH         LINE#         425
+  C:53B4H         LINE#         426
+  C:53CBH         LINE#         427
+  -------         ENDPROC       _ILI9341_DRAWVLINE
+  -------         PROC          _ILI9341_DRAWHOLLOWCIRCLE
+  X:051FH         SYMBOL        X
+  X:0521H         SYMBOL        Y
+  X:0523H         SYMBOL        radius
+  X:0525H         SYMBOL        color
+  -------         DO            
+  X:0527H         SYMBOL        x
+  X:0529H         SYMBOL        y
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 15
+
+
+  X:052BH         SYMBOL        dx
+  X:052DH         SYMBOL        dy
+  X:052FH         SYMBOL        err
+  -------         ENDDO         
+  C:3D79H         LINE#         429
+  C:3D8DH         LINE#         430
+  C:3DA2H         LINE#         431
+  C:3DA7H         LINE#         432
+  C:3DACH         LINE#         433
+  C:3DB2H         LINE#         434
+  C:3DC7H         LINE#         436
+  C:3DE6H         LINE#         437
+  C:3E08H         LINE#         438
+  C:3E32H         LINE#         439
+  C:3E5DH         LINE#         440
+  C:3E88H         LINE#         441
+  C:3E9FH         LINE#         442
+  C:3EB9H         LINE#         443
+  C:3ED3H         LINE#         444
+  C:3EE9H         LINE#         446
+  C:3EFAH         LINE#         447
+  C:3F08H         LINE#         448
+  C:3F1CH         LINE#         449
+  C:3F2AH         LINE#         450
+  C:3F2AH         LINE#         452
+  C:3F3EH         LINE#         453
+  C:3F4CH         LINE#         454
+  C:3F5AH         LINE#         455
+  C:3F88H         LINE#         456
+  C:3F88H         LINE#         457
+  C:3F8BH         LINE#         458
+  -------         ENDPROC       _ILI9341_DRAWHOLLOWCIRCLE
+  -------         PROC          _ILI9341_DRAWFILLEDCIRCLE
+  X:04F7H         SYMBOL        X
+  X:04F9H         SYMBOL        Y
+  D:0002H         SYMBOL        radius
+  X:04FDH         SYMBOL        color
+  -------         DO            
+  X:04FFH         SYMBOL        x
+  X:0501H         SYMBOL        y
+  X:0503H         SYMBOL        xChange
+  X:0505H         SYMBOL        yChange
+  X:0507H         SYMBOL        radiusError
+  X:0509H         SYMBOL        i
+  -------         ENDDO         
+  C:4196H         LINE#         460
+  C:41A4H         LINE#         461
+  C:41ACH         LINE#         462
+  C:41B1H         LINE#         463
+  C:41C6H         LINE#         464
+  C:41CDH         LINE#         465
+  C:41D1H         LINE#         467
+  C:41F0H         LINE#         468
+  C:4224H         LINE#         469
+  C:423DH         LINE#         470
+  C:4260H         LINE#         471
+  C:4270H         LINE#         473
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 16
+
+
+  C:42ADH         LINE#         474
+  C:42C7H         LINE#         475
+  C:42EAH         LINE#         476
+  C:42FAH         LINE#         478
+  C:4308H         LINE#         479
+  C:431CH         LINE#         480
+  C:432AH         LINE#         482
+  C:4352H         LINE#         483
+  C:4360H         LINE#         484
+  C:436CH         LINE#         485
+  C:437AH         LINE#         486
+  C:437AH         LINE#         487
+  C:437DH         LINE#         488
+  -------         ENDPROC       _ILI9341_DRAWFILLEDCIRCLE
+  -------         PROC          _ILI9341_DRAWHOLLOWRECTANGLE
+  X:04E1H         SYMBOL        X0
+  X:04E3H         SYMBOL        Y0
+  X:04E5H         SYMBOL        X1
+  X:04E7H         SYMBOL        Y1
+  X:04E9H         SYMBOL        color
+  X:04EBH         SYMBOL        thickness
+  -------         DO            
+  X:04ECH         SYMBOL        i
+  X:04EDH         SYMBOL        xLen
+  X:04EFH         SYMBOL        yLen
+  X:04F1H         SYMBOL        negX
+  X:04F2H         SYMBOL        negY
+  X:04F3H         SYMBOL        negCalc
+  -------         ENDDO         
+  C:3F8CH         LINE#         490
+  C:3FA0H         LINE#         492
+  C:3FA7H         LINE#         493
+  C:3FABH         LINE#         494
+  C:3FADH         LINE#         495
+  C:3FAFH         LINE#         496
+  C:3FB7H         LINE#         498
+  C:3FD0H         LINE#         499
+  C:3FEEH         LINE#         500
+  C:3FF8H         LINE#         502
+  C:4017H         LINE#         503
+  C:4035H         LINE#         506
+  C:403BH         LINE#         507
+  C:404DH         LINE#         508
+  C:404FH         LINE#         509
+  C:404FH         LINE#         510
+  C:406AH         LINE#         511
+  C:406AH         LINE#         513
+  C:407BH         LINE#         514
+  C:408CH         LINE#         515
+  C:40A1H         LINE#         516
+  C:40A9H         LINE#         524
+  C:40AFH         LINE#         525
+  C:40C1H         LINE#         526
+  C:40C3H         LINE#         527
+  C:40C3H         LINE#         528
+  C:40DEH         LINE#         529
+  C:40DEH         LINE#         531
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 17
+
+
+  C:40EFH         LINE#         532
+  C:4124H         LINE#         533
+  C:415DH         LINE#         534
+  C:4166H         LINE#         538
+  C:4183H         LINE#         539
+  C:4195H         LINE#         540
+  C:4195H         LINE#         541
+  -------         ENDPROC       _ILI9341_DRAWHOLLOWRECTANGLE
+  -------         PROC          _ILI9341_DRAWFILLEDRECTANGLECOORD
+  X:04C9H         SYMBOL        X0
+  X:04CBH         SYMBOL        Y0
+  X:04CDH         SYMBOL        X1
+  X:04CFH         SYMBOL        Y1
+  X:04D1H         SYMBOL        color
+  -------         DO            
+  X:04D3H         SYMBOL        xLen
+  X:04D5H         SYMBOL        yLen
+  X:04D7H         SYMBOL        negX
+  X:04D8H         SYMBOL        negY
+  X:04D9H         SYMBOL        negCalc
+  X:04DDH         SYMBOL        X0True
+  X:04DFH         SYMBOL        Y0True
+  -------         ENDDO         
+  C:4B89H         LINE#         543
+  C:4B9DH         LINE#         544
+  C:4BA4H         LINE#         545
+  C:4BA8H         LINE#         546
+  C:4BAAH         LINE#         547
+  C:4BACH         LINE#         548
+  C:4BB4H         LINE#         549
+  C:4BBBH         LINE#         550
+  C:4BBFH         LINE#         552
+  C:4BD7H         LINE#         553
+  C:4BF6H         LINE#         554
+  C:4C00H         LINE#         556
+  C:4C1EH         LINE#         557
+  C:4C3DH         LINE#         559
+  C:4C43H         LINE#         560
+  C:4C55H         LINE#         561
+  C:4C55H         LINE#         562
+  C:4C57H         LINE#         563
+  C:4C57H         LINE#         564
+  C:4C72H         LINE#         565
+  C:4C7AH         LINE#         566
+  C:4C7AH         LINE#         568
+  C:4C80H         LINE#         569
+  C:4C92H         LINE#         570
+  C:4C92H         LINE#         571
+  C:4C94H         LINE#         572
+  C:4C94H         LINE#         573
+  C:4CAFH         LINE#         574
+  C:4CB7H         LINE#         575
+  C:4CB7H         LINE#         577
+  -------         ENDPROC       _ILI9341_DRAWFILLEDRECTANGLECOORD
+  -------         PROC          _ILI9341_DRAWHOLLOWELLIPSE
+  X:045DH         SYMBOL        x0
+  X:045FH         SYMBOL        y0
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 18
+
+
+  X:0461H         SYMBOL        rx
+  X:0465H         SYMBOL        ry
+  X:0469H         SYMBOL        color
+  -------         DO            
+  X:046BH         SYMBOL        x
+  X:046FH         SYMBOL        y
+  X:0473H         SYMBOL        rx2
+  X:0477H         SYMBOL        ry2
+  X:047BH         SYMBOL        fx2
+  X:047FH         SYMBOL        fy2
+  X:0483H         SYMBOL        s
+  -------         ENDDO         
+  C:2202H         LINE#         580
+  C:2210H         LINE#         582
+  C:2233H         LINE#         583
+  C:2251H         LINE#         584
+  C:226EH         LINE#         585
+  C:228BH         LINE#         588
+  C:22A8H         LINE#         589
+  C:22C4H         LINE#         591
+  C:23AEH         LINE#         594
+  C:23EDH         LINE#         595
+  C:242DH         LINE#         596
+  C:246EH         LINE#         597
+  C:24AEH         LINE#         598
+  C:24C7H         LINE#         599
+  C:251AH         LINE#         600
+  C:253CH         LINE#         601
+  C:253CH         LINE#         602
+  C:25A1H         LINE#         603
+  C:25C3H         LINE#         605
+  C:26ADH         LINE#         608
+  C:26ECH         LINE#         609
+  C:272CH         LINE#         610
+  C:276DH         LINE#         611
+  C:27ADH         LINE#         612
+  C:27C6H         LINE#         613
+  C:2819H         LINE#         614
+  C:283BH         LINE#         615
+  C:283BH         LINE#         616
+  C:28A0H         LINE#         617
+  C:28C2H         LINE#         618
+  -------         ENDPROC       _ILI9341_DRAWHOLLOWELLIPSE
+  -------         PROC          _ILI9341_DRAWFILLEDELLIPSE
+  X:0487H         SYMBOL        x0
+  X:0489H         SYMBOL        y0
+  X:048BH         SYMBOL        rx
+  X:048FH         SYMBOL        ry
+  X:0493H         SYMBOL        color
+  -------         DO            
+  X:0495H         SYMBOL        x
+  X:0499H         SYMBOL        y
+  X:049DH         SYMBOL        rx2
+  X:04A1H         SYMBOL        ry2
+  X:04A5H         SYMBOL        fx2
+  X:04A9H         SYMBOL        fy2
+  X:04ADH         SYMBOL        s
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 19
+
+
+  -------         ENDDO         
+  C:28C3H         LINE#         620
+  C:28D1H         LINE#         622
+  C:28F4H         LINE#         623
+  C:2912H         LINE#         624
+  C:292FH         LINE#         625
+  C:294CH         LINE#         628
+  C:2969H         LINE#         629
+  C:2985H         LINE#         631
+  C:2A6FH         LINE#         632
+  C:2ACCH         LINE#         633
+  C:2B28H         LINE#         635
+  C:2B41H         LINE#         636
+  C:2B94H         LINE#         637
+  C:2BB6H         LINE#         638
+  C:2BB6H         LINE#         639
+  C:2C1BH         LINE#         640
+  C:2C3DH         LINE#         642
+  C:2D27H         LINE#         643
+  C:2D84H         LINE#         644
+  C:2DE0H         LINE#         646
+  C:2DF9H         LINE#         647
+  C:2E4CH         LINE#         648
+  C:2E6EH         LINE#         649
+  C:2E6EH         LINE#         650
+  C:2ED3H         LINE#         651
+  C:2EF5H         LINE#         653
+  -------         ENDPROC       _ILI9341_DRAWFILLEDELLIPSE
+  -------         PROC          _ILI9341_DRAWCHAR
+  D:0007H         SYMBOL        ch
+  D:0001H         SYMBOL        font
+  X:0014H         SYMBOL        X
+  X:0016H         SYMBOL        Y
+  X:0018H         SYMBOL        color
+  X:001AH         SYMBOL        bgcolor
+  -------         DO            
+  D:0005H         SYMBOL        fOffset
+  X:001CH         SYMBOL        fWidth
+  X:001DH         SYMBOL        fHeight
+  X:001EH         SYMBOL        fBPL
+  X:001FH         SYMBOL        tempChar
+  X:0022H         SYMBOL        j
+  X:0024H         SYMBOL        i
+  D:0007H         SYMBOL        z
+  D:0006H         SYMBOL        b
+  -------         ENDDO         
+  C:4A0EH         LINE#         659
+  C:4A0EH         LINE#         666
+  C:4A24H         LINE#         668
+  C:4A28H         LINE#         669
+  C:4A32H         LINE#         670
+  C:4A3CH         LINE#         671
+  C:4A46H         LINE#         673
+  C:4A6EH         LINE#         676
+  C:4AA2H         LINE#         678
+  C:4AC3H         LINE#         679
+  C:4AC3H         LINE#         680
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 20
+
+
+  C:4AE5H         LINE#         681
+  C:4AE5H         LINE#         682
+  C:4B23H         LINE#         683
+  C:4B35H         LINE#         684
+  C:4B38H         LINE#         685
+  C:4B38H         LINE#         686
+  C:4B66H         LINE#         687
+  C:4B66H         LINE#         688
+  C:4B77H         LINE#         689
+  C:4B88H         LINE#         690
+  -------         ENDPROC       _ILI9341_DRAWCHAR
+  -------         PROC          _ILI9341_DRAWTEXT
+  X:0000H         SYMBOL        str
+  X:0003H         SYMBOL        font
+  X:0006H         SYMBOL        X
+  X:0008H         SYMBOL        Y
+  X:000AH         SYMBOL        color
+  X:000CH         SYMBOL        bgcolor
+  -------         DO            
+  D:0007H         SYMBOL        charWidth
+  X:000EH         SYMBOL        fOffset
+  X:000FH         SYMBOL        fWidth
+  D:0001H         SYMBOL        tempChar
+  -------         ENDDO         
+  C:51CCH         LINE#         692
+  C:51D7H         LINE#         694
+  C:51E7H         LINE#         695
+  C:51F1H         LINE#         698
+  C:5205H         LINE#         699
+  C:5205H         LINE#         700
+  C:524DH         LINE#         703
+  C:5288H         LINE#         704
+  C:528CH         LINE#         706
+  C:52A2H         LINE#         707
+  C:52A2H         LINE#         709
+  C:52B5H         LINE#         710
+  C:52B7H         LINE#         712
+  C:52B7H         LINE#         713
+  C:52C6H         LINE#         714
+  C:52C6H         LINE#         716
+  C:52D0H         LINE#         717
+  C:52D3H         LINE#         718
+  -------         ENDPROC       _ILI9341_DRAWTEXT
+  -------         PROC          _ILI9341_DRAWIMAGE
+  X:050BH         SYMBOL        x
+  X:050DH         SYMBOL        y
+  X:050FH         SYMBOL        width
+  X:0511H         SYMBOL        height
+  X:0513H         SYMBOL        image
+  X:0516H         SYMBOL        orientation
+  -------         DO            
+  X:0517H         SYMBOL        counter
+  X:051BH         SYMBOL        i
+  -------         ENDDO         
+  C:4886H         LINE#         720
+  C:489AH         LINE#         721
+  C:48A4H         LINE#         723
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 21
+
+
+  C:48ACH         LINE#         724
+  C:48ACH         LINE#         725
+  C:48B1H         LINE#         726
+  C:48FAH         LINE#         727
+  C:48FCH         LINE#         728
+  C:4903H         LINE#         729
+  C:4903H         LINE#         730
+  C:4908H         LINE#         731
+  C:491AH         LINE#         732
+  C:491CH         LINE#         733
+  C:4923H         LINE#         734
+  C:4923H         LINE#         735
+  C:4928H         LINE#         736
+  C:493BH         LINE#         737
+  C:493DH         LINE#         738
+  C:4943H         LINE#         739
+  C:4943H         LINE#         740
+  C:4947H         LINE#         741
+  C:495DH         LINE#         742
+  C:495DH         LINE#         745
+  C:499FH         LINE#         746
+  C:499FH         LINE#         747
+  C:49C4H         LINE#         748
+  C:49E4H         LINE#         751
+  C:49EBH         LINE#         752
+  C:4A0DH         LINE#         753
+  -------         ENDPROC       _ILI9341_DRAWIMAGE
+  -------         PROC          _ILI9341_DRAWBMP
+  X:0000H         SYMBOL        x
+  X:0002H         SYMBOL        y
+  X:0004H         SYMBOL        width
+  X:0006H         SYMBOL        height
+  X:0008H         SYMBOL        image
+  X:000BH         SYMBOL        color
+  X:000DH         SYMBOL        bg_color
+  -------         DO            
+  X:000FH         SYMBOL        i
+  X:0011H         SYMBOL        j
+  X:0013H         SYMBOL        k
+  X:0014H         SYMBOL        byte
+  D:0007H         SYMBOL        bit_bmp
+  X:0015H         SYMBOL        buff1
+  X:0017H         SYMBOL        buff2
+  -------         ENDDO         
+  C:4E4EH         LINE#         755
+  C:4E62H         LINE#         762
+  C:4E6FH         LINE#         763
+  C:4E72H         LINE#         764
+  C:4E7FH         LINE#         765
+  C:4E82H         LINE#         766
+  C:4EC9H         LINE#         767
+  C:4ECBH         LINE#         768
+  C:4ECDH         LINE#         770
+  C:4EECH         LINE#         771
+  C:4F12H         LINE#         772
+  C:4F39H         LINE#         773
+  C:4F48H         LINE#         774
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 22
+
+
+  C:4F5CH         LINE#         775
+  C:4F61H         LINE#         776
+  C:4F65H         LINE#         777
+  C:4F67H         LINE#         778
+  C:4F67H         LINE#         779
+  C:4F72H         LINE#         780
+  C:4F72H         LINE#         781
+  C:4F7AH         LINE#         783
+  C:4F8BH         LINE#         784
+  C:4F9CH         LINE#         785
+  C:4F9EH         LINE#         786
+  -------         ENDPROC       _ILI9341_DRAWBMP
+  -------         PROC          _ILI9341_DRAWICON
+  X:0244H         SYMBOL        x
+  X:0246H         SYMBOL        y
+  X:0248H         SYMBOL        width
+  X:024AH         SYMBOL        height
+  X:024CH         SYMBOL        buff
+  X:024FH         SYMBOL        siz
+  -------         DO            
+  X:0251H         SYMBOL        BufferSize
+  X:0255H         SYMBOL        SendingSize
+  X:0259H         SYMBOL        SendingInBlock
+  X:025DH         SYMBOL        RemainderFromBlock
+  X:0261H         SYMBOL        i
+  X:0265H         SYMBOL        j
+  X:0269H         SYMBOL        BurstBuffer
+  -------         ENDDO         
+  C:2EF6H         LINE#         787
+  C:2F0AH         LINE#         788
+  C:2F14H         LINE#         795
+  C:2F58H         LINE#         797
+  C:2F89H         LINE#         798
+  C:2FA8H         LINE#         799
+  C:2FA8H         LINE#         801
+  C:2FD9H         LINE#         802
+  C:2FF8H         LINE#         803
+  C:2FF8H         LINE#         805
+  C:303FH         LINE#         807
+  C:3041H         LINE#         808
+  C:3043H         LINE#         809
+  C:3059H         LINE#         810
+  C:307CH         LINE#         811
+  C:30A7H         LINE#         813
+  C:30D6H         LINE#         814
+  C:30FDH         LINE#         815
+  C:3167H         LINE#         816
+  C:3195H         LINE#         817
+  C:31B7H         LINE#         818
+  C:31CCH         LINE#         819
+  C:31EEH         LINE#         821
+  C:3226H         LINE#         822
+  C:3290H         LINE#         823
+  C:32BEH         LINE#         824
+  C:32E0H         LINE#         825
+  C:32F5H         LINE#         826
+  C:32F7H         LINE#         827
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 23
+
+
+  -------         ENDPROC       _ILI9341_DRAWICON
+  -------         ENDMOD        ILI9341
+
+  -------         MODULE        SPI
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  D:0080H         PUBLIC        P0
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  C:59FCH         PUBLIC        _Spi_Write_Buff
+  D:00B0H         PUBLIC        P3
+  C:5AAFH         PUBLIC        _Spi_Read_Byte
+  D:00A8H         PUBLIC        IE
+  C:5ADDH         PUBLIC        _Spi_Write_Byte
+  D:00B8H         PUBLIC        IP
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  D:00D8H         PUBLIC        PWM0CON0
+  D:00F5H         PUBLIC        SPDR
+  D:0091H         PUBLIC        SFRS
+  D:00F8H         PUBLIC        SCON_1
+  D:00F4H         PUBLIC        SPSR
+  D:00E8H         PUBLIC        ADCCON0
+  D:00C0H         PUBLIC        I2CON
+  D:00C8H         PUBLIC        T2CON
+  D:00D0H         PUBLIC        PSW
+  -------         PROC          _SPI_WRITE_BYTE
+  D:0007H         SYMBOL        u8SpiWB
+  C:5ADDH         LINE#         4
+  C:5ADDH         LINE#         5
+  C:5ADDH         LINE#         6
+  C:5ADFH         LINE#         7
+  C:5AE4H         LINE#         8
+  C:5AEAH         LINE#         9
+  -------         ENDPROC       _SPI_WRITE_BYTE
+  -------         PROC          _SPI_READ_BYTE
+  D:0007H         SYMBOL        u8SpiWB
+  -------         DO            
+  D:0007H         SYMBOL        u8SpiRB
+  -------         ENDDO         
+  C:5AAFH         LINE#         11
+  C:5AAFH         LINE#         12
+  C:5AAFH         LINE#         14
+  C:5AB1H         LINE#         15
+  C:5AB6H         LINE#         16
+  C:5AB8H         LINE#         17
+  C:5ABEH         LINE#         18
+  C:5ABEH         LINE#         19
+  -------         ENDPROC       _SPI_READ_BYTE
+  -------         PROC          _SPI_WRITE_BUFF
+  X:023FH         SYMBOL        buff
+  X:0242H         SYMBOL        len
+  -------         DO            
+  D:0006H         SYMBOL        i
+  -------         ENDDO         
+  C:59FCH         LINE#         21
+  C:5A0DH         LINE#         23
+  C:5A1DH         LINE#         24
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 24
+
+
+  C:5A31H         LINE#         25
+  C:5A36H         LINE#         26
+  C:5A3CH         LINE#         27
+  C:5A43H         LINE#         28
+  -------         ENDPROC       _SPI_WRITE_BUFF
+  -------         ENDMOD        SPI
+
+  -------         MODULE        COMMON
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  D:0080H         PUBLIC        P0
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  D:00B0H         PUBLIC        P3
+  D:00A8H         PUBLIC        IE
+  D:00B8H         PUBLIC        IP
+  B:0020H.0       PUBLIC        BIT_TMP
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  D:00D8H         PUBLIC        PWM0CON0
+  D:00F8H         PUBLIC        SCON_1
+  D:00E8H         PUBLIC        ADCCON0
+  D:00C0H         PUBLIC        I2CON
+  D:00C8H         PUBLIC        T2CON
+  C:5B0BH         PUBLIC        _Read_APROM_BYTE
+  D:00D0H         PUBLIC        PSW
+  -------         PROC          _READ_APROM_BYTE
+  D:0082H         SYMBOL        u16_addr
+  -------         DO            
+  D:0007H         SYMBOL        rdata
+  -------         ENDDO         
+  C:5B0BH         LINE#         17
+  C:5B0FH         LINE#         18
+  C:5B0FH         LINE#         20
+  C:5B12H         LINE#         21
+  C:5B12H         LINE#         22
+  -------         ENDPROC       _READ_APROM_BYTE
+  -------         ENDMOD        COMMON
+
+  -------         MODULE        WATCHDOG
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  D:0080H         PUBLIC        P0
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  D:00B0H         PUBLIC        P3
+  B:00A8H.7       PUBLIC        EA
+  D:00A8H         PUBLIC        IE
+  D:00C7H         PUBLIC        TA
+  D:00B8H         PUBLIC        IP
+  C:437EH         PUBLIC        Disable_WDT_Reset_Config
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  D:00D8H         PUBLIC        PWM0CON0
+  C:56DEH         PUBLIC        Enable_WDT_Reset_Config
+  D:009FH         PUBLIC        CHPCON
+  D:0091H         PUBLIC        SFRS
+  D:00A5H         PUBLIC        IAPUEN
+  D:00F8H         PUBLIC        SCON_1
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 25
+
+
+  D:00A4H         PUBLIC        IAPTRG
+  D:00E8H         PUBLIC        ADCCON0
+  D:00C0H         PUBLIC        I2CON
+  D:00A7H         PUBLIC        IAPAH
+  D:00AEH         PUBLIC        IAPFD
+  D:00C8H         PUBLIC        T2CON
+  D:00A6H         PUBLIC        IAPAL
+  D:00AFH         PUBLIC        IAPCN
+  D:00D0H         PUBLIC        PSW
+  D:00AAH         PUBLIC        WDCON
+  -------         PROC          ENABLE_WDT_RESET_CONFIG
+  C:56DEH         LINE#         14
+  C:56DEH         LINE#         15
+  C:56DEH         LINE#         16
+  C:56F4H         LINE#         17
+  C:56F7H         LINE#         18
+  C:56F9H         LINE#         19
+  C:56FCH         LINE#         20
+  C:56FFH         LINE#         21
+  C:5712H         LINE#         22
+  C:5727H         LINE#         24
+  C:572CH         LINE#         26
+  C:573FH         LINE#         27
+  C:5755H         LINE#         28
+  C:576AH         LINE#         29
+  -------         ENDPROC       ENABLE_WDT_RESET_CONFIG
+  -------         PROC          DISABLE_WDT_RESET_CONFIG
+  -------         DO            
+  D:0007H         SYMBOL        cf0
+  D:0006H         SYMBOL        cf1
+  D:0005H         SYMBOL        cf2
+  D:0004H         SYMBOL        cf3
+  D:0003H         SYMBOL        cf4
+  -------         ENDDO         
+  C:437EH         LINE#         40
+  C:437EH         LINE#         41
+  C:437EH         LINE#         44
+  C:4394H         LINE#         45
+  C:4396H         LINE#         46
+  C:4398H         LINE#         47
+  C:439BH         LINE#         48
+  C:43B0H         LINE#         49
+  C:43B2H         LINE#         50
+  C:43B5H         LINE#         51
+  C:43CAH         LINE#         52
+  C:43CCH         LINE#         53
+  C:43CFH         LINE#         54
+  C:43E4H         LINE#         55
+  C:43E6H         LINE#         56
+  C:43E9H         LINE#         57
+  C:43FEH         LINE#         58
+  C:4400H         LINE#         59
+  C:4403H         LINE#         60
+  C:4418H         LINE#         61
+  C:441AH         LINE#         62
+  C:441EH         LINE#         64
+  C:4431H         LINE#         65
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 26
+
+
+  C:4434H         LINE#         66
+  C:4437H         LINE#         67
+  C:4439H         LINE#         68
+  C:443CH         LINE#         69
+  C:4451H         LINE#         71
+  C:4454H         LINE#         72
+  C:4456H         LINE#         73
+  C:446BH         LINE#         74
+  C:446EH         LINE#         75
+  C:4472H         LINE#         76
+  C:4487H         LINE#         77
+  C:448AH         LINE#         78
+  C:448EH         LINE#         79
+  C:44A3H         LINE#         80
+  C:44A6H         LINE#         81
+  C:44AAH         LINE#         82
+  C:44BFH         LINE#         83
+  C:44C2H         LINE#         84
+  C:44C6H         LINE#         85
+  C:44DBH         LINE#         87
+  C:44EEH         LINE#         88
+  C:4503H         LINE#         90
+  C:4508H         LINE#         91
+  C:4508H         LINE#         92
+  C:451EH         LINE#         93
+  C:4533H         LINE#         94
+  C:4533H         LINE#         95
+  -------         ENDPROC       DISABLE_WDT_RESET_CONFIG
+  -------         ENDMOD        WATCHDOG
+
+  -------         MODULE        SYS
+  C:0000H         SYMBOL        _ICE_DUMMY_
+  D:0080H         PUBLIC        P0
+  D:0090H         PUBLIC        P1
+  D:00A0H         PUBLIC        P2
+  D:00B0H         PUBLIC        P3
+  D:0084H         PUBLIC        RCTRIM0
+  D:0085H         PUBLIC        RCTRIM1
+  B:00A8H.7       PUBLIC        EA
+  C:576BH         PUBLIC        _FsysSelect
+  D:00A8H         PUBLIC        IE
+  D:0096H         PUBLIC        CKSWT
+  D:00C7H         PUBLIC        TA
+  D:00B8H         PUBLIC        IP
+  D:0097H         PUBLIC        CKEN
+  C:57E1H         PUBLIC        _ClockDisable
+  D:0087H         PUBLIC        PCON
+  D:0098H         PUBLIC        SCON
+  D:0088H         PUBLIC        TCON
+  D:00D8H         PUBLIC        PWM0CON0
+  C:53CCH         PUBLIC        _ClockEnable
+  D:009FH         PUBLIC        CHPCON
+  D:0091H         PUBLIC        SFRS
+  D:00F8H         PUBLIC        SCON_1
+  D:00A4H         PUBLIC        IAPTRG
+  C:4F9FH         PUBLIC        _MODIFY_HIRC
+  D:00E8H         PUBLIC        ADCCON0
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 27
+
+
+  D:00C0H         PUBLIC        I2CON
+  D:00A7H         PUBLIC        IAPAH
+  D:00AEH         PUBLIC        IAPFD
+  C:5647H         PUBLIC        _ClockSwitch
+  D:00C8H         PUBLIC        T2CON
+  D:00A6H         PUBLIC        IAPAL
+  D:00AFH         PUBLIC        IAPCN
+  D:00D0H         PUBLIC        PSW
+  -------         PROC          _MODIFY_HIRC
+  D:0007H         SYMBOL        u8HIRCSEL
+  -------         DO            
+  D:0008H         SYMBOL        hircmap0
+  D:0009H         SYMBOL        hircmap1
+  D:000AH         SYMBOL        offset
+  D:000BH         SYMBOL        judge
+  D:0006H         SYMBOL        trimvalue16bit
+  -------         ENDDO         
+  C:4F9FH         LINE#         24
+  C:4F9FH         LINE#         25
+  C:4F9FH         LINE#         29
+  C:4FA2H         LINE#         30
+  C:4FAEH         LINE#         31
+  C:4FAEH         LINE#         32
+  C:4FAEH         LINE#         33
+  C:4FB1H         LINE#         34
+  C:4FB3H         LINE#         35
+  C:4FB3H         LINE#         36
+  C:4FB3H         LINE#         37
+  C:4FB3H         LINE#         38
+  C:4FB6H         LINE#         40
+  C:4FB6H         LINE#         41
+  C:4FB6H         LINE#         42
+  C:4FCCH         LINE#         43
+  C:4FCEH         LINE#         44
+  C:4FD1H         LINE#         45
+  C:4FE6H         LINE#         46
+  C:4FE9H         LINE#         47
+  C:4FEBH         LINE#         48
+  C:5000H         LINE#         49
+  C:5003H         LINE#         51
+  C:500BH         LINE#         52
+  C:500BH         LINE#         53
+  C:500BH         LINE#         54
+  C:501EH         LINE#         55
+  C:5025H         LINE#         56
+  C:502AH         LINE#         57
+  C:5032H         LINE#         59
+  C:5035H         LINE#         60
+  C:5038H         LINE#         61
+  C:503BH         LINE#         62
+  C:5050H         LINE#         63
+  C:5061H         LINE#         64
+  C:5061H         LINE#         65
+  C:5068H         LINE#         66
+  C:5068H         LINE#         67
+  C:5079H         LINE#         68
+  C:507BH         LINE#         69
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 28
+
+
+  C:507DH         LINE#         71
+  C:5085H         LINE#         72
+  C:5085H         LINE#         73
+  C:508CH         LINE#         75
+  C:508CH         LINE#         76
+  C:508CH         LINE#         77
+  C:508CH         LINE#         79
+  C:508FH         LINE#         80
+  C:5092H         LINE#         81
+  C:5095H         LINE#         82
+  C:5098H         LINE#         83
+  C:509BH         LINE#         84
+  C:509EH         LINE#         85
+  C:50B4H         LINE#         86
+  C:50B7H         LINE#         87
+  -------         ENDPROC       _MODIFY_HIRC
+  -------         PROC          _FSYSSELECT
+  D:0007H         SYMBOL        u8FsysMode
+  C:576BH         LINE#         101
+  C:576BH         LINE#         102
+  C:576BH         LINE#         103
+  C:577DH         LINE#         104
+  C:577DH         LINE#         106
+  C:577DH         LINE#         107
+  C:5782H         LINE#         108
+  C:5787H         LINE#         109
+  C:578CH         LINE#         110
+  C:578EH         LINE#         111
+  C:578EH         LINE#         112
+  C:5790H         LINE#         115
+  C:5790H         LINE#         116
+  C:5795H         LINE#         117
+  C:579AH         LINE#         118
+  C:579AH         LINE#         121
+  C:579AH         LINE#         122
+  C:579FH         LINE#         123
+  C:57A1H         LINE#         124
+  C:57A1H         LINE#         125
+  C:57A3H         LINE#         128
+  C:57A3H         LINE#         129
+  C:57A8H         LINE#         130
+  C:57ADH         LINE#         131
+  C:57B2H         LINE#         132
+  C:57B4H         LINE#         133
+  C:57B4H         LINE#         134
+  C:57B6H         LINE#         137
+  C:57B6H         LINE#         138
+  C:57BBH         LINE#         139
+  C:57C0H         LINE#         140
+  C:57C5H         LINE#         141
+  C:57CAH         LINE#         142
+  C:57E0H         LINE#         143
+  C:57E0H         LINE#         144
+  C:57E0H         LINE#         145
+  -------         ENDPROC       _FSYSSELECT
+  -------         PROC          _CLOCKENABLE
+  D:0007H         SYMBOL        u8FsysMode
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 29
+
+
+  C:53CCH         LINE#         147
+  C:53CCH         LINE#         148
+  C:53CCH         LINE#         149
+  C:53E7H         LINE#         150
+  C:53E7H         LINE#         152
+  C:53E7H         LINE#         153
+  C:53FDH         LINE#         154
+  C:5412H         LINE#         155
+  C:541DH         LINE#         156
+  C:541DH         LINE#         159
+  C:541DH         LINE#         160
+  C:5433H         LINE#         161
+  C:543DH         LINE#         162
+  C:543DH         LINE#         165
+  C:543DH         LINE#         166
+  C:5453H         LINE#         167
+  C:545AH         LINE#         168
+  C:545AH         LINE#         171
+  C:545AH         LINE#         172
+  C:5470H         LINE#         173
+  C:5485H         LINE#         174
+  C:548CH         LINE#         175
+  C:548CH         LINE#         178
+  C:548CH         LINE#         179
+  C:54A2H         LINE#         180
+  C:54B7H         LINE#         181
+  C:54BCH         LINE#         182
+  C:54BCH         LINE#         183
+  C:54BCH         LINE#         184
+  -------         ENDPROC       _CLOCKENABLE
+  -------         PROC          _CLOCKDISABLE
+  D:0007H         SYMBOL        u8FsysMode
+  -------         DO            
+  B:0020H.1       SYMBOL        closeflag
+  -------         ENDDO         
+  C:57E1H         LINE#         186
+  C:57E1H         LINE#         187
+  C:57E1H         LINE#         188
+  C:57E3H         LINE#         190
+  C:57E6H         LINE#         191
+  C:57F8H         LINE#         192
+  C:57F8H         LINE#         194
+  C:57F8H         LINE#         195
+  C:57FAH         LINE#         196
+  C:57FCH         LINE#         198
+  C:57FCH         LINE#         199
+  C:580EH         LINE#         200
+  C:5810H         LINE#         202
+  C:5810H         LINE#         203
+  C:5826H         LINE#         204
+  C:5828H         LINE#         206
+  C:5828H         LINE#         207
+  C:582AH         LINE#         208
+  C:582AH         LINE#         210
+  C:582AH         LINE#         214
+  C:582DH         LINE#         215
+  C:582DH         LINE#         216
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 30
+
+
+  C:5843H         LINE#         217
+  C:5845H         LINE#         218
+  C:5845H         LINE#         220
+  -------         ENDPROC       _CLOCKDISABLE
+  -------         PROC          _CLOCKSWITCH
+  D:0007H         SYMBOL        u8FsysMode
+  -------         DO            
+  B:0020H.2       SYMBOL        exflag
+  -------         ENDDO         
+  C:5647H         LINE#         222
+  C:5647H         LINE#         223
+  C:5647H         LINE#         224
+  C:5649H         LINE#         225
+  C:564CH         LINE#         226
+  C:5652H         LINE#         227
+  C:5664H         LINE#         228
+  C:5664H         LINE#         230
+  C:5664H         LINE#         231
+  C:5666H         LINE#         232
+  C:5668H         LINE#         234
+  C:5668H         LINE#         235
+  C:567AH         LINE#         236
+  C:567AH         LINE#         237
+  C:567CH         LINE#         239
+  C:567CH         LINE#         240
+  C:5692H         LINE#         241
+  C:56A7H         LINE#         242
+  C:56A9H         LINE#         244
+  C:56A9H         LINE#         245
+  C:56ABH         LINE#         246
+  C:56ABH         LINE#         248
+  C:56ABH         LINE#         252
+  C:56AEH         LINE#         253
+  C:56AEH         LINE#         254
+  C:56C4H         LINE#         255
+  C:56D9H         LINE#         256
+  C:56D9H         LINE#         257
+  C:56DDH         LINE#         258
+  -------         ENDPROC       _CLOCKSWITCH
+  -------         ENDMOD        SYS
+
+  -------         MODULE        ?C_STARTUP
+  C:55ADH         SEGMENT       ?C_C51STARTUP
+  I:0021H         SEGMENT       ?STACK
+  C:0000H         PUBLIC        ?C_STARTUP
+  D:00E0H         SYMBOL        ACC
+  D:00F0H         SYMBOL        B
+  D:0083H         SYMBOL        DPH
+  D:0082H         SYMBOL        DPL
+  N:0000H         SYMBOL        IBPSTACK
+  N:0100H         SYMBOL        IBPSTACKTOP
+  N:0080H         SYMBOL        IDATALEN
+  C:55B0H         SYMBOL        IDATALOOP
+  N:0000H         SYMBOL        PBPSTACK
+  N:0000H         SYMBOL        PBPSTACKTOP
+  N:0000H         SYMBOL        PDATALEN
+  N:0000H         SYMBOL        PDATASTART
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 31
+
+
+  N:0000H         SYMBOL        PPAGE
+  N:0000H         SYMBOL        PPAGEENABLE
+  D:00A0H         SYMBOL        PPAGE_SFR
+  D:0081H         SYMBOL        SP
+  C:55ADH         SYMBOL        STARTUP1
+  N:0000H         SYMBOL        XBPSTACK
+  N:0000H         SYMBOL        XBPSTACKTOP
+  N:02FFH         SYMBOL        XDATALEN
+  C:55BBH         SYMBOL        XDATALOOP
+  N:0000H         SYMBOL        XDATASTART
+  C:0000H         LINE#         94
+  C:55ADH         LINE#         109
+  C:55AFH         LINE#         110
+  C:55B0H         LINE#         111
+  C:55B1H         LINE#         112
+  C:55B3H         LINE#         116
+  C:55B6H         LINE#         117
+  C:55B8H         LINE#         119
+  C:55BAH         LINE#         123
+  C:55BBH         LINE#         124
+  C:55BCH         LINE#         125
+  C:55BDH         LINE#         126
+  C:55BFH         LINE#         127
+  C:55C1H         LINE#         161
+  C:55C4H         LINE#         165
+  -------         ENDMOD        ?C_STARTUP
+
+  -------         MODULE        ?C?FPCMP
+  C:367EH         PUBLIC        ?C?FPCMP
+  C:367CH         PUBLIC        ?C?FPCMP3
+  -------         ENDMOD        ?C?FPCMP
+
+  -------         MODULE        ?C?FCAST
+  C:36FFH         PUBLIC        ?C?FCASTC
+  C:36FAH         PUBLIC        ?C?FCASTI
+  C:36F5H         PUBLIC        ?C?FCASTL
+  -------         ENDMOD        ?C?FCAST
+
+  -------         MODULE        ?C?CLDPTR
+  C:3733H         PUBLIC        ?C?CLDPTR
+  -------         ENDMOD        ?C?CLDPTR
+
+  -------         MODULE        ?C?CLDOPTR
+  C:374CH         PUBLIC        ?C?CLDOPTR
+  -------         ENDMOD        ?C?CLDOPTR
+
+  -------         MODULE        ?C?IMUL
+  C:3779H         PUBLIC        ?C?IMUL
+  -------         ENDMOD        ?C?IMUL
+
+  -------         MODULE        ?C?UIDIV
+  C:378BH         PUBLIC        ?C?UIDIV
+  -------         ENDMOD        ?C?UIDIV
+
+  -------         MODULE        ?C?IILDX
+  C:37E0H         PUBLIC        ?C?IILDX
+  -------         ENDMOD        ?C?IILDX
+BL51 BANKED LINKER/LOCATER V6.22.4.0                                                  04/14/2025  22:12:07  PAGE 32
+
+
+
+  -------         MODULE        ?C?ILDPTR
+  C:37F6H         PUBLIC        ?C?ILDPTR
+  -------         ENDMOD        ?C?ILDPTR
+
+  -------         MODULE        ?C?ILDOPTR
+  C:3821H         PUBLIC        ?C?ILDOPTR
+  -------         ENDMOD        ?C?ILDOPTR
+
+  -------         MODULE        ?C?ISTPTR
+  C:3859H         PUBLIC        ?C?ISTPTR
+  -------         ENDMOD        ?C?ISTPTR
+
+  -------         MODULE        ?C?LMUL
+  C:3878H         PUBLIC        ?C?LMUL
+  -------         ENDMOD        ?C?LMUL
+
+  -------         MODULE        ?C?ULDIV
+  C:3903H         PUBLIC        ?C?ULDIV
+  -------         ENDMOD        ?C?ULDIV
+
+  -------         MODULE        ?C?LNEG
+  C:3995H         PUBLIC        ?C?LNEG
+  -------         ENDMOD        ?C?LNEG
+
+  -------         MODULE        ?C?ULCMP
+  C:39A3H         PUBLIC        ?C?ULCMP
+  -------         ENDMOD        ?C?ULCMP
+
+  -------         MODULE        ?C?LSTXDATA
+  C:39B4H         PUBLIC        ?C?LSTXDATA
+  -------         ENDMOD        ?C?LSTXDATA
+
+  -------         MODULE        ?C?LSTKXDATA
+  C:39C0H         PUBLIC        ?C?LSTKXDATA
+  -------         ENDMOD        ?C?LSTKXDATA
+
+  -------         MODULE        ?C?OFFXADD
+  C:39F1H         PUBLIC        ?C?OFFXADD
+  -------         ENDMOD        ?C?OFFXADD
+
+  -------         MODULE        ABS
+  C:5AEBH         PUBLIC        _ABS
+  -------         ENDMOD        ABS
+
+******************************************************************************
+* RESTRICTED VERSION WITH 0800H BYTE CODE SIZE LIMIT; USED: 4F0BH BYTE (988%) *
+******************************************************************************
+
+Program Size: data=13.3 xdata=1361 code=21273
+LINK/LOCATE RUN COMPLETE.  0 WARNING(S),  0 ERROR(S)
+
+*** FATAL ERROR L250: CODE SIZE LIMIT IN RESTRICTED VERSION EXCEEDED
+    MODULE:  C:\KEIL_V5\C51\LIB\C51L.LIB (-----)
+    LIMIT:   0800H BYTES

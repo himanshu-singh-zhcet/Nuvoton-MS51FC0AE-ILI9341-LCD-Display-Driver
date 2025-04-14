@@ -1,0 +1,712 @@
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE IOTFYIOT
+OBJECT MODULE PLACED IN .\Objects\iotfyIot.obj
+COMPILER INVOKED BY: C:\Users\shash\AppData\Local\Keil_v5\C51\BIN\C51.EXE Src\iotfyIot.c LARGE OPTIMIZE(8,SPEED) BROWSE 
+                    -INCDIR(.\Device\Include;.\Driver\inc;.\Src) DEBUG OBJECTEXTEND PRINT(.\Listings\iotfyIot.lst) TABS(2) OBJECT(.\Objects\i
+                    -otfyIot.obj)
+
+line level    source
+
+   1          #include "common.h"
+   2          #include "MS51_32K.H"
+   3          #include "uart.h"
+   4          #include "device.h"
+   5          #include "function.h"
+   6          #include "wdtConfig.h"
+   7          #include "iotfyI2c.h"
+   8          #include "uartSerial.h"
+   9          #include "iotfyEeprom.h"
+  10          #include "mcfMotorDriver.h"
+  11          #include "buzzer.h"
+  12          
+  13          #include <string.h>
+  14          #if (ENABLE_LED == 1)
+  15            #include "led_indication.h"
+  16          #endif
+  17          
+  18          #if (ENABLE_IOT == 1)
+  19          
+  20            #include "iotfyIot.h"
+  21            #define CHECKSERIAL_TIMEOUT     10
+  22          // 4778176311984128
+  23            const char IOTFY_COMPANY_NAME[10] = "IoT5";       //Change here with your company name
+  24            const char IOTFY_PRODUCT_NAME[10] = "BFan";     //Change here with your Product name
+  25            const char IOTFY_MODEL_ID[20]   = "5650639071739904"; //Change here with your Product ID
+  26          
+  27            /*
+  28            ----------------------------------------------------------------------------
+  29                            Macro Define
+  30            ----------------------------------------------------------------------------
+  31            */
+  32          
+  33            #define SDK_VERSION             "01"
+  34            #define FIRMWARE_VERSION      "02R"
+  35          
+  36            #define GET_NETWORK_STS         1,2
+  37            #define GET_BIND_STS            1,4
+  38            #define UNBIND_DEVICE           2,3
+  39            #define META_DATA_REQUEST   4,1
+  40            #define DEVICE_STATE            6,1
+  41            #define SERIAL_UPDATE           7,1
+  42            #define LQC_UPDATE          9,3
+  43            #define QUICK_CONNECT_MODE      10,1
+  44            #define WIFI_MODE               10,2
+  45            #define STOP_ONBOARDING         10,3
+  46          
+  47            #define SET_DEVICE_QUICK_CONNECT_MODE 0x0A, 2
+  48            #define SET_DEVICE_WIFI_MODE      0x0A, 1
+  49          
+  50            /*
+  51              ----------------------------------------------------------------------------
+  52              *     Global Variables - IoTfy
+  53              ----------------------------------------------------------------------------
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 2   
+
+  54            */
+  55          
+  56            unsigned char iotfyJbuf[OUTGOING_ARRAY_SIZE]  = {'\0'};
+  57            unsigned char iotfySnum[10] = {'\0'};
+  58            unsigned char sendString[OUTGOING_ARRAY_SIZE] = {'\0'};
+  59          
+  60            volatile unsigned char iotfySbuf[INCOMING_ARRAY_SIZE]  = {'\0'};
+  61            volatile unsigned char iotfySbufIndex = 0;
+  62            volatile unsigned char iotfyTout    = 0;
+  63            volatile unsigned char totallength    = 0;
+  64            volatile unsigned char String_rcv     = 0;
+  65          
+  66            /*
+  67              ----------------------------------------------------------------------------
+  68              *     Global Variables - Helper
+  69              ----------------------------------------------------------------------------
+  70            */
+  71          
+  72            unsigned char  iotfyNetwork              = 0;
+  73            unsigned char  iotfyBindStatus           = 0;
+  74            unsigned char  iotfyAck                  = 0;
+  75            unsigned char  lqcStatus         = 0;
+  76            unsigned char  lqcCompleted          = 0;
+  77          
+  78            unsigned char iotfyMetaDataFlag      = 0;
+  79            unsigned char iotfyDvcStateFlag          = 0;
+  80            unsigned char iotfyGotCommandFlag        = 0;
+  81            unsigned char iotfyProcessCommandFlag    = 0;
+  82            unsigned char iotfySerialUpdateFlag      = 0;
+  83            unsigned char iotfyUnbindDeviceFlag      = 0;
+  84            unsigned char iotfyLqcStateUpdateFlag    = 0;
+  85          
+  86            unsigned char iotfySetOnboardingModeFlag = 0;
+  87            unsigned char iotfyLQCWiFi               = 0;
+  88            dvcOnboarding_t iotfyOnboardingMode;
+  89          
+  90            /*
+  91              ----------------------------------------------------------------------------
+  92                *  Device Specific Parameters...
+  93              ----------------------------------------------------------------------------
+  94            */
+  95          
+  96            extern volatile fanConfig currentConfig, previousConfig;
+  97          
+  98          
+  99          
+ 100            /*********************************************************************/
+ 101            unsigned char computeCrc(unsigned char *cdata, unsigned int len) {
+ 102   1          unsigned char  crc = 0;
+ 103   1          unsigned int   i   = 0;
+ 104   1      
+ 105   1          for(i = 0; i < len; i++) {
+ 106   2            crc += cdata[i];
+ 107   2          }
+ 108   1          return crc;
+ 109   1        }
+ 110          
+ 111            void iotfyVarsInit(void) {
+ 112   1          memset(iotfySbuf,  '\0', sizeof(iotfySbuf));
+ 113   1          memset(iotfyJbuf,  '\0', sizeof(iotfyJbuf));
+ 114   1          memset(sendString, '\0', sizeof(sendString));
+ 115   1          memset(iotfySnum,  '\0', sizeof(iotfySnum));
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 3   
+
+ 116   1      
+ 117   1          iotfyTout           = 0;
+ 118   1          iotfySbufIndex          = 0;
+ 119   1          totallength             = 0;
+ 120   1          String_rcv              = 0;
+ 121   1      
+ 122   1          iotfyNetwork                = 0;
+ 123   1          iotfyBindStatus             = 0;
+ 124   1          iotfyAck                    = 0;
+ 125   1          lqcStatus           = 0;
+ 126   1          lqcCompleted          = 0;
+ 127   1      
+ 128   1          iotfyMetaDataFlag         = 0;
+ 129   1          iotfyDvcStateFlag           = 0;
+ 130   1          iotfyGotCommandFlag         = 0;
+ 131   1          iotfyProcessCommandFlag     = 0;
+ 132   1          iotfySerialUpdateFlag       = 0;
+ 133   1          iotfyUnbindDeviceFlag       = 0;
+ 134   1          iotfyLqcStateUpdateFlag     = 0;
+ 135   1      
+ 136   1          iotfySetOnboardingModeFlag  = 0;
+ 137   1          iotfyOnboardingMode         = NOT_IN_ONBOARDING_MODE;
+ 138   1          iotfyLQCWiFi                = 0;
+ 139   1        }
+ 140          
+ 141            int validateString(void) {
+ 142   1          unsigned char x = 0;
+ 143   1          unsigned char strCheck[INCOMING_ARRAY_SIZE] = {'\0'};
+ 144   1          unsigned char dataLength = 0; 
+ 145   1          unsigned char crcCal = 0;
+ 146   1          unsigned char crcStr = 0;
+ 147   1          int ValidIndex = -1;
+ 148   1          
+ 149   1          for (x = 0; x<totallength; x++) {
+ 150   2            if ((iotfySbuf[x] == 0x28) && (iotfySbuf[x+1] == 0x7E)) {
+ 151   3              ValidIndex = x;
+ 152   3              break;
+ 153   3            }
+ 154   2          }
+ 155   1      
+ 156   1          if(ValidIndex >= 0) {
+ 157   2            dataLength = (256 * iotfySbuf[ValidIndex + 4]) + iotfySbuf[ValidIndex + 5];
+ 158   2            for(x = 0; x<dataLength + 6; x++) {
+ 159   3              strCheck[x] = iotfySbuf[ValidIndex + 1 + x];  
+ 160   3            }
+ 161   2      
+ 162   2            crcStr = iotfySbuf[ValidIndex + dataLength + 7];
+ 163   2            crcCal = computeCrc(strCheck, dataLength + 5);
+ 164   2            
+ 165   2            if ((crcStr == crcCal) && (iotfySbuf[ValidIndex + dataLength + 8] == 0x29)) {
+ 166   3      
+ 167   3            } else {
+ 168   3              ValidIndex = -1;
+ 169   3            }
+ 170   2          }
+ 171   1          
+ 172   1          clearSerialBuffer();
+ 173   1          return ValidIndex;
+ 174   1        }
+ 175          
+ 176            void commandCheck(void) {
+ 177   1          unsigned char  cmdM = 0;
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 4   
+
+ 178   1          unsigned char  cmdS = 0;
+ 179   1          unsigned char  msgLen = 0;
+ 180   1          unsigned char  x = 0;
+ 181   1          unsigned int   i = 0;
+ 182   1      
+ 183   1          int iotfyValidIndex = -1;
+ 184   1          
+ 185   1          if(String_rcv!= 2) {
+ 186   2            return;
+ 187   2          }
+ 188   1      
+ 189   1          String_rcv = 0;
+ 190   1          DISABLE_UART0_INTERRUPT;
+ 191   1          iotfyValidIndex = validateString();
+ 192   1          if(iotfyValidIndex == -1) {
+ 193   2            ENABLE_UART0_INTERRUPT;
+ 194   2            return;
+ 195   2          }
+ 196   1      
+ 197   1          cmdM = iotfySbuf[iotfyValidIndex + 2];
+ 198   1          cmdS = iotfySbuf[iotfyValidIndex + 3];
+ 199   1          
+ 200   1          msgLen = (256 * iotfySbuf[iotfyValidIndex + 4]) + iotfySbuf[iotfyValidIndex + 5];
+ 201   1          
+ 202   1          for(x = 0; x<INCOMING_ARRAY_SIZE; x++) {
+ 203   2            iotfyJbuf[x] ='\0';
+ 204   2          }     
+ 205   1          
+ 206   1          for(i = 0; i<msgLen; i++) {
+ 207   2            iotfyJbuf[i] = iotfySbuf[iotfyValidIndex + 6 + i];  
+ 208   2          }
+ 209   1          
+ 210   1          if ((cmdM == 0x01) && (cmdS == 0x04)) {
+ 211   2            if(getIntValue("\"bind\"")!=-1) {
+ 212   3              iotfyBindStatus = getIntValue("\"bind\"");
+ 213   3              if(iotfyBindStatus == 1) {
+ 214   4                setBuzzerVariables(BUZZER_BIND);
+ 215   4              #if (ENABLE_LED == 1)
+ 216   4                setLedVariables(LED_BIND);
+ 217   4              #endif
+ 218   4      
+ 219   4              } else {
+ 220   4      
+ 221   4                setDeviceIntoOnboardingMode(WIFI_MODE_ONBOARDING);
+ 222   4              }
+ 223   3            }
+ 224   2          } else if((cmdM == 0x04) && (cmdS == 0x01) )  {
+ 225   2            iotfyMetaDataFlag = 1;
+ 226   2          } else if ((cmdM == 0x06) && (cmdS == 0x01)) {
+ 227   2            iotfyDvcStateFlag = 1;  
+ 228   2          } else if ((cmdM == 0x08) && (cmdS == 0x01)) {
+ 229   2            iotfyGotCommandFlag = 1;
+ 230   2          } else if ((cmdM == 0x09) && (cmdS == 0x01)) {
+ 231   2            iotfyLQCWiFi = 1; 
+ 232   2          } else if ((cmdM == 0x09) && (cmdS == 0x03)) {
+ 233   2            iotfyLqcStateUpdateFlag = 1;
+ 234   2          } else if ((cmdM == 0x0A) && (cmdS == 0x01)) {
+ 235   2            iotfyOnboardingMode = WIFI_MODE_ONBOARDING;
+ 236   2            setBuzzerVariables(BUZZER_AP_MODE);
+ 237   2            #if (ENABLE_LED == 1)
+ 238   2              setLedVariables(LED_AP_MODE);
+ 239   2            #endif
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 5   
+
+ 240   2          } else if ((cmdM == 0x0A) && (cmdS == 0x02)) {
+ 241   2            iotfyOnboardingMode = SMART_CONFIG_ONBORDING;
+ 242   2            setBuzzerVariables(BUZZER_SC_MODE);
+ 243   2            #if (ENABLE_LED == 1)
+ 244   2              setLedVariables(LED_SC_MODE);
+ 245   2            #endif
+ 246   2          } else if ((cmdM == 0x0A) && (cmdS == 0x03)) {
+ 247   2            iotfyOnboardingMode = NOT_IN_ONBOARDING_MODE;
+ 248   2            setBuzzerVariables(BUZZER_OFF);
+ 249   2            #if (ENABLE_LED == 1)
+ 250   2              setLedVariables(LED_OFF);
+ 251   2            #endif
+ 252   2          } else {
+ 253   2            //invalid command 
+ 254   2          }
+ 255   1          ENABLE_UART0_INTERRUPT; 
+ 256   1        }
+ 257          
+ 258            void sendCommand(unsigned char mt, unsigned char st) {
+ 259   1          unsigned char strSend[7] = {0x7E , 0, 0, 0, 0, 0, 0};
+ 260   1          unsigned short crcSend;
+ 261   1          DISABLE_UART0_INTERRUPT;
+ 262   1          strSend[1] = mt;
+ 263   1          strSend[2] = st;
+ 264   1      
+ 265   1          crcSend = computeCrc(strSend, 5);
+ 266   1          
+ 267   1          strSend[5] = crcSend/256;
+ 268   1          strSend[6] = crcSend%256;
+ 269   1      
+ 270   1          
+ 271   1          uartTxChar(0x28);
+ 272   1          uartTxStringLength(strSend, 7);
+ 273   1          uartTxChar(0x29);
+ 274   1          ENABLE_UART0_INTERRUPT;
+ 275   1        }
+ 276          
+ 277            void sendDataCommand(unsigned char mt, unsigned char st, unsigned char sendData) {
+ 278   1          unsigned char strSend[8] = {0x7E, 0, 0, 0, 0, 0, 0, 0};
+ 279   1          unsigned short crcSend;
+ 280   1          strSend[1] = mt;
+ 281   1          strSend[2] = st;
+ 282   1          strSend[3] = 0;
+ 283   1          strSend[4] = 1;
+ 284   1          strSend[5] = sendData;
+ 285   1          crcSend = computeCrc(strSend, 6);
+ 286   1          strSend[6] = crcSend/256;
+ 287   1          strSend[7] = crcSend%256;
+ 288   1          uartTxChar(0x28);
+ 289   1          uartTxStringLength(strSend, 8);
+ 290   1          uartTxChar(0x29);
+ 291   1        }
+ 292          
+ 293            void sendData(unsigned char mt, unsigned char st, char *sdata) {
+ 294   1          unsigned short crcSend;
+ 295   1          unsigned int len = strlen(sdata);
+ 296   1          int x = 0;
+ 297   1          
+ 298   1          DISABLE_UART0_INTERRUPT;
+ 299   1          sendString[0] = 0x7E;
+ 300   1          sendString[1] = mt;
+ 301   1          sendString[2] = st;
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 6   
+
+ 302   1          sendString[3] = len/256;
+ 303   1          sendString[4] = len%256;
+ 304   1          
+ 305   1          for (x = 0; x<len; x++) {
+ 306   2              sendString[5 + x] = sdata[x];
+ 307   2            }
+ 308   1      
+ 309   1          crcSend = computeCrc(sendString, len + 5);
+ 310   1          sendString[len + 5] = crcSend/256;
+ 311   1          sendString[len + 6] = crcSend%256;
+ 312   1      
+ 313   1          uartTxChar(0x28);
+ 314   1          uartTxStringLength(sendString, len+7);
+ 315   1          uartTxChar(0x29);
+ 316   1      
+ 317   1          ENABLE_UART0_INTERRUPT;
+ 318   1        }
+ 319            
+ 320            void sendMetaData(unsigned char mt, unsigned char st) {
+ 321   1      
+ 322   1          jsonBegin();
+ 323   1          addStringObject("company", IOTFY_COMPANY_NAME, 1);
+ 324   1          addStringObject("product", IOTFY_PRODUCT_NAME, 0 );
+ 325   1          addStringObject("id", IOTFY_MODEL_ID, 0);
+ 326   1          jsonEnd();
+ 327   1          sendData(mt, st, (char *)iotfyJbuf);
+ 328   1        }
+ 329            // {"udid":"294800005","fv":"0020","flv":"9","mComVer":9,"type":0,"ts":1693648463553,"settings":{"pow":1,
+ 330            // "fan":{"pow":1,"fspd":5,"timer":0,"mode":0,"reverse":1},"light":{"pow":0},
+ 331            // "ts":1693648463553,"version":0,"src":"fpush","lcmd":""},"data":{"rst":"External System","rssi":-52,"fa
+             -n":{"rtimer":0}}}
+ 332            void sendDeviceState(unsigned char mt, unsigned char st) {
+ 333   1          #if BREAK_STATE_UPDATE
+                    
+                  #else
+ 336   1            jsonBegin();
+ 337   1            addStringObject("\"sVer\"", SDK_VERSION, 1);
+ 338   1            addStringObject("\"fVer\"", FIRMWARE_VERSION, 0);
+ 339   1            addObject("\"pow\"",    currentConfig.powerState, 0);
+ 340   1            addObject("\"fan.pow\"",    currentConfig.fanPowerState, 0);
+ 341   1            addObject("\"fan.mode\"",   currentConfig.mode, 0);
+ 342   1            addObject("\"fan.fspd\"",   currentConfig.fanSpeed, 0);
+ 343   1            addObject("\"fan.timer\"",      currentConfig.timer, 0);
+ 344   1            addObject("\"fan.reverse\"",    currentConfig.reverse, 0);
+ 345   1            addObject("\"light.pow\"",      currentConfig.light, 0);
+ 346   1            
+ 347   1            dataBegin();
+ 348   1            // addObject("\"fanrpm\"",    currentConfig.fanRpm,   1);
+ 349   1            addObject("\"fan.rtimer\"",   currentConfig.timerSec, 1);
+ 350   1            // addObject("\"disp\"",    currentConfig.light,  0);   
+ 351   1            dataEnd();
+ 352   1      
+ 353   1            jsonEnd();
+ 354   1            sendData(mt, st, (char *)iotfyJbuf);
+ 355   1          #endif
+ 356   1        }
+ 357          
+ 358            void serialHandler(void) {
+ 359   1          commandCheck();
+ 360   1      
+ 361   1          if(iotfyMetaDataFlag) {
+ 362   2            sendMetaData(META_DATA_REQUEST);
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 7   
+
+ 363   2            iotfyMetaDataFlag = 0;
+ 364   2          }
+ 365   1      
+ 366   1          if(iotfyDvcStateFlag) {
+ 367   2            sendDeviceState(DEVICE_STATE);
+ 368   2            iotfyDvcStateFlag = 0;
+ 369   2          }
+ 370   1      
+ 371   1          if(iotfyGotCommandFlag) {
+ 372   2            processCommand();
+ 373   2            iotfyGotCommandFlag = 0;
+ 374   2          }
+ 375   1      
+ 376   1          if(iotfyUnbindDeviceFlag) {
+ 377   2            sendCommand(UNBIND_DEVICE);
+ 378   2            iotfyUnbindDeviceFlag = 0;
+ 379   2          }
+ 380   1      
+ 381   1          if(iotfySerialUpdateFlag) {
+ 382   2            sendDeviceState(SERIAL_UPDATE);
+ 383   2            iotfySerialUpdateFlag = 0;
+ 384   2          }
+ 385   1          
+ 386   1          if(iotfySetOnboardingModeFlag) {
+ 387   2            iotfySetOnboardingModeFlag = 0;
+ 388   2            // setBuzzerVariables(BUZZER_ON_BOARDING);
+ 389   2            if(iotfyOnboardingMode == SMART_CONFIG_ONBORDING) {
+ 390   3              sendCommand(SET_DEVICE_QUICK_CONNECT_MODE);
+ 391   3            } else if(iotfyOnboardingMode == WIFI_MODE_ONBOARDING) {
+ 392   3              sendCommand(SET_DEVICE_WIFI_MODE);
+ 393   3            } else {
+ 394   3              sendCommand(STOP_ONBOARDING);
+ 395   3            }
+ 396   2          }
+ 397   1      
+ 398   1          if((iotfyLqcStateUpdateFlag) && (lqcCompleted == 1)) {
+ 399   2            sendDataCommand(LQC_UPDATE, lqcStatus);
+ 400   2            setBuzzerVariables(BUZZER_LQC_COMPLETE);
+ 401   2            #if (ENABLE_LED == 1)
+ 402   2              setLedVariables(LED_LQC_COMPLETE);
+ 403   2            #endif
+ 404   2            
+ 405   2            iotfyLqcStateUpdateFlag = 0;
+ 406   2          }
+ 407   1        }
+ 408          
+ 409            void processCommand(void) {
+ 410   1          uint8_t stateUpdate = 0;
+ 411   1          uint8_t buzzerUpdate = 0;
+ 412   1          
+ 413   1      
+ 414   1          if(getIntValue("\"pow\"")!= -1) {
+ 415   2            currentConfig.powerState = getIntValue("\"pow\"");
+ 416   2            currentConfig.fanPowerState = currentConfig.powerState;
+ 417   2            currentConfig.light = currentConfig.powerState;
+ 418   2            stateUpdate = 1;
+ 419   2          }
+ 420   1          if(getIntValue("\"fan.pow\"")!= -1) {
+ 421   2            currentConfig.fanPowerState = getIntValue("\"fan.pow\"");
+ 422   2            if(currentConfig.fanPowerState == 1){
+ 423   3              currentConfig.powerState = 1;
+ 424   3            }
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 8   
+
+ 425   2            stateUpdate = 1;
+ 426   2          }
+ 427   1      
+ 428   1          if(getIntValue("\"fan.mode\"")!= -1) {
+ 429   2            currentConfig.mode = getIntValue("\"fan.mode\"");
+ 430   2            if(currentConfig.mode!= previousConfig.mode) {
+ 431   3              stateUpdate = 1;
+ 432   3              }
+ 433   2          }
+ 434   1      
+ 435   1      
+ 436   1          if(getIntValue("\"fan.fspd\"")!= -1) {
+ 437   2            currentConfig.fanSpeed  = getIntValue("\"fan.fspd\"");
+ 438   2            currentConfig.mode    = DEFAULT;
+ 439   2            if(currentConfig.fanSpeed!= previousConfig.fanSpeed) {
+ 440   3              stateUpdate = 1;
+ 441   3            }
+ 442   2            
+ 443   2          }
+ 444   1          if(getIntValue("\"fan.reverse\"")!= -1) {
+ 445   2            currentConfig.reverse = getIntValue("\"fan.reverse\"");
+ 446   2            stateUpdate = 1;
+ 447   2          }
+ 448   1          if(getIntValue("\"light.pow\"")!= -1) {
+ 449   2            currentConfig.light = getIntValue("\"light.pow\"");
+ 450   2            if(currentConfig.light == 1){
+ 451   3              currentConfig.powerState = 1;
+ 452   3            }
+ 453   2            stateUpdate = 1;
+ 454   2          }
+ 455   1      
+ 456   1          if(getIntValue("\"fan.timer\"")!= -1) {
+ 457   2            if(currentConfig.fanPowerState == 1 && currentConfig.fanPowerState == 1) {
+ 458   3              currentConfig.timer = getIntValue("\"fan.timer\"");
+ 459   3              currentConfig.timerSec = currentConfig.timer;
+ 460   3              stateUpdate = 1;
+ 461   3            }
+ 462   2          }
+ 463   1      
+ 464   1          if(stateUpdate == 1) {
+ 465   2            setHardwareState();
+ 466   2            stateUpdate = 0;
+ 467   2          }
+ 468   1      
+ 469   1        }
+ 470          
+ 471            dvcOnboarding_t getOnboardingMode(void) {
+ 472   1          return iotfyOnboardingMode;
+ 473   1        }
+ 474          
+ 475            void setDeviceIntoOnboardingMode(dvcOnboarding_t mode) {
+ 476   1          if(mode == iotfyOnboardingMode) {
+ 477   2            return;
+ 478   2          }
+ 479   1          iotfyOnboardingMode = mode;
+ 480   1          iotfySetOnboardingModeFlag = 1;
+ 481   1        }
+ 482          
+ 483            
+ 484            void serialTimeHandler(void) {
+ 485   1          if(String_rcv!= 1) {
+ 486   2            return;
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 9   
+
+ 487   2          }
+ 488   1      
+ 489   1          iotfyTout++;
+ 490   1          if(iotfyTout>= CHECKSERIAL_TIMEOUT) {
+ 491   2            totallength = iotfySbufIndex;
+ 492   2            iotfySbufIndex = 0;
+ 493   2            String_rcv = 2;
+ 494   2            iotfyTout = 0;
+ 495   2          }
+ 496   1        }
+ 497            
+ 498            void serialReceiveHandler(uint8_t rvcdData) {
+ 499   1          if(iotfySbufIndex >(INCOMING_ARRAY_SIZE - 1)) {
+ 500   2            iotfySbufIndex = 0;
+ 501   2          }
+ 502   1          
+ 503   1          iotfySbuf[iotfySbufIndex] = rvcdData; 
+ 504   1          iotfySbufIndex = iotfySbufIndex + 1;    
+ 505   1          iotfyTout   = 0;
+ 506   1          String_rcv  = 1;    
+ 507   1        }
+ 508            /*----------------------------------------------------------------------------
+ 509             *   Helper Function Definition
+ 510             *----------------------------------------------------------------------------*/
+ 511          
+ 512            long int string2int(char *value) {
+ 513   1            long int number = 0;
+ 514   1          unsigned char x = 0;
+ 515   1          unsigned char len    = strlen(value);
+ 516   1          
+ 517   1          for(x = 0; x<len; x++) {
+ 518   2              number = (number * 10) + (value[x] - 48);
+ 519   2          }
+ 520   1      
+ 521   1          return number;
+ 522   1        }
+ 523          
+ 524            long int getIntValue(char *str) {
+ 525   1          char *index = strstr((char *)iotfyJbuf, str);
+ 526   1          char  value[10];
+ 527   1          unsigned char  i = 0;
+ 528   1          unsigned char  x = 0;
+ 529   1          unsigned char  negative = 0;
+ 530   1          
+ 531   1          if(strlen(index)<3) {
+ 532   2              return -1;
+ 533   2            }
+ 534   1          
+ 535   1          while(index[x]!=':') {
+ 536   2              x++;
+ 537   2            }
+ 538   1          
+ 539   1          x++;
+ 540   1          
+ 541   1          if(index[x]=='-') {
+ 542   2            negative = 1;
+ 543   2          } else if(index[x]=='"') {
+ 544   2            x++;
+ 545   2            if(index[x]=='-') {
+ 546   3              negative = 1;
+ 547   3              x++;
+ 548   3            }
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 10  
+
+ 549   2          }
+ 550   1          
+ 551   1          while((index[x]!=',')&&(index[x]!='}')&&(index[x]!='"')) {
+ 552   2            value[i] = index[x];
+ 553   2            x++;
+ 554   2            i++;
+ 555   2          }
+ 556   1      
+ 557   1          value[i] = '\0';
+ 558   1          if(negative) {
+ 559   2              return (string2int(value)) * (-1);  
+ 560   2            } else {
+ 561   2              return string2int(value);
+ 562   2            }
+ 563   1        }
+ 564          
+ 565            void clearSerialBuffer(void) {
+ 566   1          iotfySbuf[0]  = '\0';
+ 567   1          iotfyTout     = 0;
+ 568   1          iotfySbufIndex  = 0;
+ 569   1          totallength   = 0;
+ 570   1        }
+ 571          
+ 572            void jsonBegin(void) {
+ 573   1          iotfyJbuf[0] = '{';
+ 574   1          iotfyJbuf[1] = '\0';
+ 575   1        }
+ 576          
+ 577            void addObject(char *param,long int num, unsigned char isFirstKey) {
+ 578   1          if(!isFirstKey) {
+ 579   2            strcat((char *)iotfyJbuf, ",");
+ 580   2          }
+ 581   1          
+ 582   1          strcat((char *)iotfyJbuf, param);
+ 583   1          strcat((char *)iotfyJbuf, ":\""); 
+ 584   1          num2String(num);
+ 585   1          strcat((char *)iotfyJbuf,(char *)iotfySnum);  
+ 586   1          strcat((char *)iotfyJbuf, "\"");  
+ 587   1        }
+ 588          
+ 589            void addStringObject(char *param, char *value, unsigned char isFirstKey) {  
+ 590   1          if(!isFirstKey) {
+ 591   2            strcat((char *)iotfyJbuf,",");
+ 592   2          }
+ 593   1              
+ 594   1          strcat((char *)iotfyJbuf, param);
+ 595   1          strcat((char *)iotfyJbuf, ":\""); 
+ 596   1          strcat((char *)iotfyJbuf, value); 
+ 597   1          strcat((char *)iotfyJbuf, "\"");  
+ 598   1        }
+ 599          
+ 600            void jsonEnd(void) {
+ 601   1          strcat((char *)iotfyJbuf, "}"); 
+ 602   1        }
+ 603          
+ 604            void dataBegin(void) {
+ 605   1          strcat((char *)iotfyJbuf, ",\"data\":{"); 
+ 606   1        }
+ 607          
+ 608            void dataEnd(void) {
+ 609   1          strcat((char *)iotfyJbuf, "}");
+ 610   1        }
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 11  
+
+ 611          
+ 612            void num2Char(unsigned char num) {
+ 613   1          char ch = num + 48;
+ 614   1          strncat((char *)iotfySnum, &ch,1);
+ 615   1          strncat((char *)iotfySnum, "", 1);
+ 616   1        }
+ 617          
+ 618            void num2Char2(unsigned int num) {
+ 619   1          unsigned char T = 0, O = 0; 
+ 620   1      
+ 621   1          T = num/10;
+ 622   1          O = num - (T*10);
+ 623   1      
+ 624   1          num2Char(T);
+ 625   1          num2Char(O);
+ 626   1        }
+ 627          
+ 628            void num2Char3(unsigned int num) {
+ 629   1          unsigned char H = 0, T = 0, O = 0;  
+ 630   1      
+ 631   1          H = num/100;
+ 632   1          T = (num - (H*100))/10;
+ 633   1          O = (num - (H*100) - (T*10));
+ 634   1          
+ 635   1          num2Char(H);
+ 636   1          num2Char(T);
+ 637   1          num2Char(O);
+ 638   1        }
+ 639          
+ 640            void num2String(long int num) { 
+ 641   1          iotfySnum[0] = '\0';
+ 642   1          if(num<0) {
+ 643   2            strcat((char *)iotfySnum,"-");
+ 644   2            num = num * (-1);
+ 645   2          }
+ 646   1          
+ 647   1          if(num>99999) {
+ 648   2            num2Char3(num/1000);
+ 649   2            num2Char3(num%1000);
+ 650   2          } else if(num>9999) {
+ 651   2            num2Char3(num/100);
+ 652   2            num2Char2(num%100);
+ 653   2          } else if(num>999) {
+ 654   2            num2Char2(num/100);
+ 655   2            num2Char2(num%100);
+ 656   2          } else if(num>99) {
+ 657   2            num2Char3(num);
+ 658   2          } else if(num>9) {
+ 659   2            num2Char2(num);
+ 660   2          } else {
+ 661   2            num2Char(num);
+ 662   2          }
+ 663   1        }
+ 664          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4050    ----
+   CONSTANT SIZE    =    323    ----
+   XDATA SIZE       =    619     252
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.60.7.0   IOTFYIOT                                                          09/12/2024 17:56:58 PAGE 12  
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

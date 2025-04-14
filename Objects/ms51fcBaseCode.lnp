@@ -1,0 +1,10 @@
+".\Objects\main.obj",
+".\Objects\ILI9341.obj",
+".\Objects\spi.obj",
+".\Objects\common.obj",
+".\Objects\watchdog.obj",
+".\Objects\sys.obj",
+".\Objects\STARTUP.obj" 
+TO ".\Objects\ms51fcBaseCode" 
+PRINT(".\Listings\ms51fcBaseCode.m51") RAMSIZE(256) 
+DISABLEWARNING (16) 
